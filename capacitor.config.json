@@ -1,0 +1,13 @@
+{
+  "appId": "com.boltyard.game",
+  "appName": "Boltyard",
+  "webDir": "www",
+  "backgroundColor": "#0e1a21",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#0e1a21",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile"
+  }
+}

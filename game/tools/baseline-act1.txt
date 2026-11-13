@@ -1,0 +1,20 @@
+
+=== 8 game(s), skill=attentive, policy=best ===
+won 8/8   shifts 93.4 (87-104)   shift-time 62m52s (min 57m54s  max 70m33s)
+  S1: cleared 8/8 at 6m36s (5m37s..7m30s) shift 20.3  arc 6m36s  pre-summon 16.1sh  attempts 2.8 (2-4)  shift len avg 20.6 p90 31.7 max 38.6  played 28.9  time-share 16%
+  S2: cleared 8/8 at 17m05s (15m42s..19m17s) shift 42.5  arc 10m29s  pre-summon 16.9sh  attempts 2.6 (1-5)  shift len avg 28.8 p90 50.9 max 62.4  played 17.3  time-share 13%
+  S3: cleared 8/8 at 30m43s (26m09s..33m31s) shift 60.8  arc 13m38s  pre-summon 13.1sh  attempts 4.3 (1-7)  shift len avg 48.3 p90 68.0 max 82.3  played 17.6  time-share 23%
+  S4: cleared 8/8 at 46m25s (41m15s..55m52s) shift 77.6  arc 15m42s  pre-summon 9.6sh  attempts 4.4 (2-8)  shift len avg 59.2 p90 79.9 max 88.8  played 26.5  time-share 41%
+  S5: cleared 8/8 at 62m52s (57m54s..70m33s) shift 93.4  arc 16m27s  pre-summon 10.8sh  attempts 3.1 (2-4)  shift len avg 82.6 p90 89.4 max 91.0  played 3.1  time-share 7%
+shift1: 7.4 bolts in 13.1s, buy possible 100%   buy-after shifts in first 5: 5.0/5
+shift len p90 73.5  max 91.0  shifts>90s per game 0.1
+dry spell avg 1.8 max 3
+warden scraps avg 23.6 (19-26; repeats 18.6)   cores earned 55.4 left 13.4  longest cores-held streak 58
+levels bought at win: 69% (68-71%)   unspent bolts 7935 = 4.0% of Titan (max 10.6%); before the final shift 4.1% (max 8.7%)
+  final levels: coil:8.0/8  coil2:8.0/8  coil3:1.6/9  pulse:6.0/6  pulse2:3.0/6  field:5.0/5  field2:4.0/5  
+  fork:3.0/4  amp:5.0/8  surge:5.6/8  chain:3.0/5  overload:3.0/5  cell:7.0/7  cell2:7.0/7  cell3:0.0/6  
+  thrust:6.4/8  recycler:4.0/5  capacitor:3.0/5  coolant:3.0/5  plating:3.9/6  spare:2.0/3  magnet:8.0/8  
+  sorter:8.0/8  sorter2:2.0/7  sweep:2.0/2  lucky:3.0/5  beacon:2.1/4  extract:1.5/3  drone:2.0/4  dronedmg:3.0/5  
+  dronerate:3.0/6  collector:0.0/1  titan:1.0/1  
+cpu: 13.2s
+CAPSTONE titan: n=8 mean shift 88.4 mean time 57.1m

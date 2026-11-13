@@ -1,0 +1,268 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Render harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e1a21; overflow: hidden; }
+  canvas#c { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+</style>
+<canvas id="c"></canvas>
+<script src="../src/data.js"></script>
+<script src="../src/engine.js"></script>
+<script src="../src/sprites.js"></script>
+<script src="../src/render.js"></script>
+<script src="../tools/autopilot.js"></script>
+<script>
+(function () {
+  var E = BY.Engine, R = BY.Render, A = BY.Autopilot;
+  var cv = document.getElementById('c');
+  var H = window.H = { run: null, save: null, errors: [], sheet: [] };
+  window.addEventListener('error', function (e) { H.errors.push(String(e.message)); });
+
+  H.init = function (o) {
+    o = o || {};
+    R.init(cv, { reducedMotion: !!o.reducedMotion, shake: o.shake !== false });
+    return R.arenaSize();
+  };
+  H.resize = function () { R.resize(); return R.arenaSize(); };
+
+  // levels: { id: level } written straight into the save (ignores requirements, it is a test rig)
+  H.start = function (o) {
+    o = o || {};
+    var save = E.newSave();
+    var up = o.up || {};
+    for (var k in up) save.up[k] = up[k];
+    if (o.flags) for (var fk in o.flags) save.flags[fk] = o.flags[fk];
+    if (o.overtime) save.overtime = { level: o.overtime - 1, best: o.overtime - 1 };
+    H.save = save;
+    var sz = R.arenaSize();
+    var run = E.startShift(save, o.sector || 1, { w: sz.w, h: sz.h, seed: o.seed || 7, attract: !!o.attract });
+    H.run = run;
+    H.god = o.god !== false;
+    H.skill = o.skill || 'attentive';
+    R.begin(run, save);
+    R.handle(run.events, run); run.events.length = 0;
+    H.draw(1 / 60);
+    return { w: run.w, h: run.h };
+  };
+
+  H.draw = function (dt, opt) { R.draw(H.run, dt || 1 / 60, opt || H.dopt || {}); };
+
+  // advance n ticks; pred(run, events) -> true stops after drawing that frame
+  H.step = function (n, pred, drawEvery) {
+    var run = H.run, de = drawEvery || 1, i, evs;
+    for (i = 0; i < n && !run.over; i++) {
+      if (H.god) { run.player.battery = run.player.maxBattery; }
+      if (H.keepBoss && run.boss.state === 'active') {
+        var b = H.bossEnemy();
+        if (b && b.hp < b.maxHp * H.keepBoss) { b.hp = b.maxHp * H.keepBoss; run.boss.hp = b.hp; }
+      }
+      var tgt = H.input ? H.input(run) : A.target(run, { skill: H.skill });
+      E.step(run, H.save, tgt);
+      evs = run.events;
+      var stop = pred ? pred(run, evs) : false;
+      R.handle(evs, run);
+      evs.length = 0;
+      if (i % de === 0 || stop) H.draw(1 / 60);
+      if (stop) return { stopped: true, t: run.t };
+    }
+    H.draw(1 / 60);
+    return { stopped: false, t: run.t };
+  };
+  H.seconds = function (s, pred, de) { return H.step(Math.round(s * 60), pred, de); };
+
+  H.bossEnemy = function () {
+    var en = H.run.enemies;
+    for (var i = 0; i < en.length; i++) if (en[i].boss && !en[i].dead) return en[i];
+    return null;
+  };
+  // Act II helpers
+  H.hold = function (x, y) { H.input = function () { return { x: x, y: y }; }; var p = H.run.player; p.x = x; p.y = y; p.vx = p.vy = 0; };
+  H.spawn = function (type, x, y, opt) { return E.spawn(H.run, type, x, y, Object.assign({ entered: true }, opt || {})); };
+  H.clearBots = function () { H.run.enemies.length = 0; };
+  H.fill = function (type, n, cx, cy, spread, opt) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var a = i * 2.399, d = spread * Math.sqrt((i + 0.5) / n);
+      out.push(E.spawn(H.run, type, cx + Math.cos(a) * d, cy + Math.sin(a) * d, Object.assign({ entered: true }, opt || {})));
+    }
+    return out;
+  };
+  H.pickups = function (n, cx, cy, spread, value) {
+    for (var i = 0; i < n; i++) H.run.pickups.push({ id: 5000 + i, kind: 'bolt', value: value || 5, x: cx + (Math.random() - 0.5) * spread, y: cy + (Math.random() - 0.5) * spread, vx: 0, vy: 0, age: 1 });
+  };
+  H.summon = function () {
+    var run = H.run;
+    run.boss.state = 'warning'; run.boss.warn = 2.5;
+    run.events.push({ type: 'bossWarn', name: run.boss.name, dur: 2.5 });
+  };
+  H.hasEvent = function (evs, type) {
+    for (var i = 0; i < evs.length; i++) if (evs[i].type === type) return true;
+    return false;
+  };
+
+  // frames after the engine stops: just FX / sprites advancing
+  H.idle = function (s) { for (var i = 0, n = Math.round(s * 60); i < n; i++) H.draw(1 / 60); };
+
+  // contact sheet
+  H.sheetAdd = function () {
+    var c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+    c.getContext('2d').drawImage(cv, 0, 0); H.sheet.push(c);
+  };
+  H.sheetBuild = function (cols) {
+    var n = H.sheet.length, w = H.sheet[0].width, h = H.sheet[0].height, rows = Math.ceil(n / cols);
+    var c = document.createElement('canvas'); c.width = w * cols; c.height = h * rows;
+    var x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
+    for (var i = 0; i < n; i++) x.drawImage(H.sheet[i], (i % cols) * w, ((i / cols) | 0) * h);
+    H.sheet = [];
+    return c.toDataURL('image/png');
+  };
+
+  // ------------------------------------------------------------- worst-case perf
+  H.perf = function (frames) {
+    frames = frames || 300;
+    var sv = E.newSave();
+    sv.up.titan = 1; sv.up.capacitor = 3; sv.up.drone = 4; sv.up.coil = 10;
+    var sz = R.arenaSize();
+    var run = E.startShift(sv, 4, { w: sz.w, h: sz.h, seed: 3 });
+    H.run = run; H.save = sv;
+    R.begin(run, sv);
+    run.events.length = 0;
+    // boss + 25 bots
+    run.boss.state = 'active'; run.boss.enemyId = 1;
+    var boss = E.spawn(run, 'hauler', run.w / 2, 90, { entered: true }); boss.type = 'foreman';
+    boss.boss = true; boss.hostile = true; boss.invuln = true; boss.r = 32;
+    var types = ['scrapling', 'roller', 'sparker', 'shieldbot', 'hauler', 'splitter', 'mite', 'turret', 'bomber', 'gilded', 'pylon'];
+    for (var i = 0; i < 25; i++) {
+      var e = E.spawn(run, types[i % types.length], 30 + Math.random() * (run.w - 60), 60 + Math.random() * (run.h - 120), { entered: true, elite: i % 6 === 0 });
+      e.hp = e.maxHp * 0.6;
+    }
+    for (i = 0; i < 150; i++) {
+      var k = i % 40 === 0 ? 'core' : (i % 25 === 0 ? 'cell' : 'bolt');
+      run.pickups.push({ id: 9000 + i, kind: k, value: 1 + (i % 7) * 9, x: 20 + Math.random() * (run.w - 40), y: 20 + Math.random() * (run.h - 40), vx: 0, vy: 0, age: Math.random() * 10 });
+    }
+    for (i = 0; i < 12; i++) run.shots.push({ id: 7000 + i, x: Math.random() * run.w, y: Math.random() * run.h, vx: 50, vy: 30, r: 5, age: 1 });
+    run.hazards.push({ id: 1, kind: 'slam', x: 180, y: 300, r: 64, x2: 0, y2: 0, w: 0, t: 0.6, dur: 1 });
+    run.hazards.push({ id: 2, kind: 'charge', x: 180, y: 90, r: 32, x2: 150, y2: 600, w: 64, t: 0.5, dur: 1 });
+    run.player.oc.active = true; run.player.oc.time = 3; run.player.oc.dur = 4; run.player.oc.charge = 1;
+    run.player.x = 180; run.player.y = 420; run.player.vx = 120;
+    run.boss.state = 'active';
+    var evs = [];
+    function mkEvents() {
+      evs.length = 0;
+      var px = run.player.x, py = run.player.y;
+      for (var j = 0; j < 3; j++) {
+        var en = run.enemies[1 + ((Math.random() * 24) | 0)];
+        evs.push({ type: 'zap', x1: px, y1: py, x2: en.x, y2: en.y, crit: j === 0, src: j === 2 ? 'chain' : 'arc' });
+        evs.push({ type: 'hit', x: en.x, y: en.y, dmg: 100000 * (j + 1), crit: j === 0, armored: false, enemyId: en.id });
+      }
+      var kk = run.enemies[1 + ((Math.random() * 24) | 0)];
+      evs.push({ type: 'kill', x: kk.x, y: kk.y, r: kk.r, enemyType: kk.type, elite: true, boss: false, bolts: 5 });
+      evs.push({ type: 'explode', x: kk.x, y: kk.y, r: 55, src: 'overload' });
+      evs.push({ type: 'pickup', kind: 'bolt', value: 7, x: px, y: py });
+      evs.push({ type: 'pickup', kind: 'bolt', value: 3, x: px, y: py });
+      evs.push({ type: 'pulse', x: px, y: py, r: 60 });
+      evs.push({ type: 'spawn', enemyType: 'roller', x: -10, y: 100, elite: false });
+    }
+    // warm up so pools saturate
+    for (i = 0; i < 40; i++) { mkEvents(); R.handle(evs, run); R.draw(run, 1 / 60, {}); }
+    var times = [], js = [], t0, st = R.stats(), maxP = 0;
+    for (i = 0; i < frames; i++) {
+      run.t += 1 / 60; run.player.x = 180 + Math.sin(i / 30) * 100;
+      t0 = performance.now();
+      mkEvents(); R.handle(evs, run);
+      R.draw(run, 1 / 60, { reticle: { x: 200, y: 300 } });
+      // force the GPU/raster pipeline to finish for honest timing
+      var tj = performance.now() - t0;
+      cv.getContext('2d').getImageData(0, 0, 1, 1);
+      times.push(performance.now() - t0); js.push(tj);
+      st = R.stats(); if (st.particles > maxP) maxP = st.particles;
+    }
+    var sum = 0, worst = 0, sorted = times.slice().sort(function (a, b) { return a - b; });
+    for (i = 0; i < times.length; i++) { sum += times[i]; if (times[i] > worst) worst = times[i]; }
+    var jsum = 0; for (i = 0; i < js.length; i++) jsum += js[i];
+    return { avgJsOnly: jsum / js.length, avg: sum / times.length, worst: worst, p95: sorted[Math.floor(times.length * 0.95)], median: sorted[times.length >> 1],
+             maxParticles: maxP, final: R.stats(), enemies: run.enemies.length, pickups: run.pickups.length };
+  };
+
+  // sector 10, Chairman phase 4, every R&D node, max bots, pickups, 40 infected, interns, a well, lattice
+  H.perf2 = function (frames, mod) {
+    frames = frames || 300;
+    var sv = E.newSave();
+    sv.up.titan = 1; sv.up.capacitor = 3; sv.up.drone = 4; sv.up.coil = 10; sv.up.takeover = 1;
+    var rnd = ['fusion', 'supercell', 'dividends', 'lattice', 'storm', 'singularity', 'severance', 'stockopt', 'rehire', 'nanites', 'parachute'];
+    for (var q = 0; q < rnd.length; q++) sv.up[rnd[q]] = 3;
+    sv.flags.act2 = true;
+    var sz = R.arenaSize();
+    var run = E.startShift(sv, 10, { w: sz.w, h: sz.h, seed: 3 });
+    H.run = run; H.save = sv; H.god = true;
+    R.begin(run, sv); run.events.length = 0;
+    var boss = E.spawn(run, 'chairman', run.w / 2, 90);
+    boss.hp = boss.maxHp * 0.2; run.boss.phase = 4;
+    var types = ['scrapling', 'roller', 'sparker', 'shieldbot', 'hauler', 'splitter', 'mite', 'turret', 'bomber', 'repo', 'printer', 'laser', 'firenode', 'auditor', 'mimic'];
+    for (var i = 0; i < 25; i++) {
+      var e = E.spawn(run, types[i % types.length], 30 + Math.random() * (run.w - 60), 60 + Math.random() * (run.h - 120), { entered: true, elite: i % 6 === 0 });
+      if (i < 20) e.infected = 4;
+      if (types[i % types.length] === 'repo') e.stolen = 5;
+      e.hp = e.maxHp * 0.6;
+    }
+    var en = run.enemies;
+    for (i = 0; i < en.length; i++) if (en[i].type !== 'firenode' && i % 3 === 0 && i > 3) en[i].shieldedBy = en[1 + (i % 6)].id;
+    for (i = 0; i < en.length; i++) if (!en[i].boss) en[i].infected = 4;
+    for (i = 0; i < 150; i++) run.pickups.push({ id: 9000 + i, kind: i % 40 === 0 ? 'core' : 'bolt', value: 1 + (i % 7) * 9, x: 20 + Math.random() * (run.w - 40), y: 20 + Math.random() * (run.h - 40), vx: 0, vy: 0, age: Math.random() * 10 });
+    for (i = 0; i < 12; i++) run.shots.push({ id: 7000 + i, x: Math.random() * run.w, y: Math.random() * run.h, vx: 50, vy: 30, r: 5, age: 1 });
+    for (i = 0; i < 4; i++) run.interns.push({ id: 8000 + i, x: 100 + i * 40, y: 300, vx: 0, vy: 0, age: 1, life: 6 });
+    run.wells.push({ id: 8100, x: 200, y: 360, r: 90, t: 0.8, pull: 160, phase: 'pull' });
+    run.hazards.push({ id: 1, kind: 'laser', x: 180, y: 90, x2: 40, y2: 700, w: 16, t: 0.9, dur: 0.9, fire: 0.5, firing: true });
+    run.hazards.push({ id: 2, kind: 'laser', x: 180, y: 90, x2: 330, y2: 700, w: 16, t: 0.5, dur: 0.9, fire: 0.5, firing: false });
+    run.hazards.push({ id: 3, kind: 'slam', x: 120, y: 400, r: 44, t: 0.5, dur: 0.9 });
+    run.hazards.push({ id: 4, kind: 'slam', x: 210, y: 440, r: 44, t: 0.3, dur: 0.9 });
+    run.hazards.push({ id: 5, kind: 'blink', x: 250, y: 250, r: 44, t: 0.3, dur: 0.6 });
+    run.player.oc.active = true; run.player.oc.time = 3; run.player.oc.dur = 4; run.player.oc.charge = 1; run.player.budget = true;
+    run.player.x = 180; run.player.y = 420; run.player.vx = 120;
+    if (mod) mod(run);
+    var evs = [];
+    function mk() {
+      evs.length = 0;
+      var px = run.player.x, py = run.player.y;
+      for (var j = 0; j < 3; j++) {
+        var en2 = run.enemies[1 + ((Math.random() * 24) | 0)];
+        evs.push({ type: 'zap', x1: px, y1: py, x2: en2.x, y2: en2.y, crit: j === 0, src: j === 2 ? 'chain' : 'arc' });
+        evs.push({ type: 'hit', x: en2.x, y: en2.y, dmg: 1e12 * (j + 1), crit: j === 0, armored: false, enemyId: en2.id });
+      }
+      var kk = run.enemies[1 + ((Math.random() * 24) | 0)];
+      evs.push({ type: 'kill', x: kk.x, y: kk.y, r: kk.r, enemyType: kk.type, elite: true, boss: false, bolts: 5 });
+      evs.push({ type: 'explode', x: kk.x, y: kk.y, r: 55, src: 'overload' });
+      evs.push({ type: 'pickup', kind: 'bolt', value: 7e9, x: px, y: py });
+      evs.push({ type: 'pulse', x: px, y: py, r: 60 });
+      evs.push({ type: 'infect', enemyId: kk.id });
+      if ((run.tick | 0) % 20 === 0) evs.push({ type: 'storm', n: 20 });
+    }
+    function tick(i) {
+      run.t += 1 / 60; run.tick++; run.player.x = 180 + Math.sin(i / 30) * 100;
+      var L = run.links; L.length = 0;
+      for (var d = 0; d < 4; d++) { var a = run.t * 2 + d * 1.57; run.drones[d] = run.drones[d] || { x: 0, y: 0, angle: 0, cd: 0 }; run.drones[d].x = run.player.x + Math.cos(a) * 34; run.drones[d].y = run.player.y + Math.sin(a) * 34; }
+      for (d = 0; d < 4; d++) { L.push({ x1: run.player.x, y1: run.player.y, x2: run.drones[d].x, y2: run.drones[d].y }); L.push({ x1: run.drones[d].x, y1: run.drones[d].y, x2: run.drones[(d + 1) % 4].x, y2: run.drones[(d + 1) % 4].y }); }
+      for (d = 0; d < run.hazards.length; d++) { var h = run.hazards[d]; if (h.kind === 'laser' && !h.firing) { h.t += 1 / 60; if (h.t > 0.9) { h.firing = true; } } if (h.kind === 'laser' && h.firing && h.id === 2) h.t = 0.95; }
+    }
+    for (i = 0; i < 40; i++) { tick(i); mk(); R.handle(evs, run); R.draw(run, 1 / 60, {}); }
+    var times = [], js = [], t0, maxP = 0;
+    for (i = 0; i < frames; i++) {
+      tick(i);
+      t0 = performance.now();
+      mk(); R.handle(evs, run);
+      R.draw(run, 1 / 60, { reticle: { x: 200, y: 300 } });
+      var tj = performance.now() - t0;
+      cv.getContext('2d').getImageData(0, 0, 1, 1);
+      times.push(performance.now() - t0); js.push(tj);
+      var st = R.stats(); if (st.particles > maxP) maxP = st.particles;
+    }
+    var sum = 0, worst = 0, sorted = times.slice().sort(function (a, b) { return a - b; }), jsum = 0;
+    for (i = 0; i < times.length; i++) { sum += times[i]; jsum += js[i]; if (times[i] > worst) worst = times[i]; }
+    return { avgJsOnly: jsum / js.length, avg: sum / times.length, worst: worst, p95: sorted[Math.floor(times.length * 0.95)], median: sorted[times.length >> 1],
+             maxParticles: maxP, enemies: run.enemies.length, pickups: run.pickups.length, final: R.stats() };
+  };
+
+  document.title = 'ready';
+})();
+</script>

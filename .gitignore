@@ -1,0 +1,7 @@
+node_modules/
+game/dist/
+game/dist-app/
+game/shots/
+build/
+out/
+.DS_Store

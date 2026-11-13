@@ -1,0 +1,162 @@
+<!doctype html><meta charset="utf-8"><title>Sprite sheet</title>
+<style>
+:root{--ink:#0e1a21;--floor:#152630;--plate:#1d3441;--plate-hi:#27475a;--line:#35596e;--text:#eaf2f4;--text-dim:#93adb9;--hazard:#ffc629;--rust:#e8642c;color-scheme:dark}
+body{margin:0;background:var(--ink);color:var(--text);font:12px system-ui;padding:12px;width:1000px}
+h2{font:700 13px system-ui;letter-spacing:.08em;text-transform:uppercase;color:var(--hazard);margin:14px 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:6px;background:var(--floor);padding:8px}
+.c{display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--text-dim)}
+canvas{display:block}
+.icons{background:var(--plate);display:flex;flex-wrap:wrap;gap:4px 10px;padding:8px}
+.ic{display:flex;flex-direction:column;align-items:center;width:62px;font-size:9px;color:var(--text-dim);gap:3px}
+.ic div{display:flex;gap:6px}
+#ic2 .ic,#ic3 .ic{width:110px}
+</style>
+<body>
+<div id="s1"><h2>Sprocket tiers</h2><div class="row" id="pl"></div></div>
+<div id="s2"><h2>Bots large (r*3) normal / elite / flash / invuln</h2><div class="row" id="bl"></div></div>
+<div id="s3"><h2>Bots game scale (1.08px/unit) and 2.4x</h2><div class="row" id="bs"></div><div class="row" id="bs2"></div></div>
+<div id="s4"><h2>Wardens (windup 0 / 1)</h2><div class="row" id="wd"></div></div>
+<div id="s5"><h2>Pickups / drone / shot (game scale, then 4x)</h2><div class="row" id="pk"></div></div>
+<div id="s6"><h2>Icons 24 / 40</h2><div class="icons" id="ic"></div></div>
+<div id="s8"><h2>ACT II bots large: normal / elite / flash / invuln(shieldedBy) / extra</h2><div class="row" id="a2l"></div></div>
+<div id="s9"><h2>ACT II bots game scale 1.08 (with Act I neighbours) and 2.4x</h2><div class="row" id="a2s"></div><div class="row" id="a2s2"></div></div>
+<div id="s10"><h2>ACT II Wardens: windup 0 / 1, true scale, invuln</h2><div class="row" id="a2w"></div></div>
+<div id="s11"><h2>Colossus vs Titan vs base; interns</h2><div class="row" id="col"></div></div>
+<div id="s12"><h2>ACT II icons 18 / 24 / 40</h2><div class="icons" id="ic2"></div></div>
+<div id="s13"><h2>ACT III bots (large, game scale, 2.4x, copy tint, elite, flash)</h2><div class="row" id="a3b"></div><div class="row" id="a3b2"></div><h2>ACT III Wardens (windup 0/1, Market bull + bear, true scale)</h2><div class="row" id="a3w"></div><h2>Magnate vs Colossus; icons</h2><div class="row" id="a3m"></div><div class="icons" id="ic3"></div><h2>Act III portraits</h2><div class="row" id="a3p"></div></div>
+<div id="s7"><h2>Portraits</h2><div class="row" id="po"></div></div>
+<script src="../src/sprites.js"></script>
+<script>
+var S=BY.Sprites,R={scrapling:11,roller:12,sparker:12,shieldbot:15,hauler:22,splitter:15,mite:7,turret:14,bomber:12,gilded:12,pylon:13,compactor:32,shredder:30,furnace:38,foreman:32,overseer:42};
+var BOTS=Object.keys(R).slice(0,11),WARD=Object.keys(R).slice(11);
+function cell(parent,w,h,label,scale,fn){var d=document.createElement('div');d.className='c';var c=document.createElement('canvas');c.width=w*2;c.height=h*2;c.style.width=w+'px';c.style.height=h+'px';var x=c.getContext('2d');x.scale(2*scale,2*scale);fn(x,w/scale,h/scale);d.appendChild(c);if(label){var l=document.createElement('span');l.textContent=label;d.appendChild(l);}parent.appendChild(d);}
+function E(type,x,y,o){var e={id:1,type:type,x:x,y:y,r:R[type],hp:5,maxHp:5,armor:0,elite:false,boss:false,hostile:false,invuln:false,flash:0,age:1.7,facing:-0.5,vx:20,vy:0,planted:true,windup:0};for(var k in o||{})e[k]=o[k];return e;}
+// player
+var pl=document.getElementById('pl'),T=1.3;
+var LO=[['base',{arc:0,chassis:0,salvage:0}],['a1c1s1',{arc:1,chassis:1,salvage:1}],['a2c2s2',{arc:2,chassis:2,salvage:2}],['a3c3s3',{arc:3,chassis:3,salvage:3}],['arc3 only',{arc:3}],['chas3 only',{chassis:3}],['salv3 only',{salvage:3}]];
+LO.forEach(function(l){cell(pl,120,150,l[0],1,function(x){S.player(x,60,110,36,{t:T,facing:0,loadout:l[1],pulse:.7});});});
+cell(pl,170,160,'titan',1,function(x){S.player(x,85,115,36,{t:T,facing:0,loadout:{arc:3,chassis:3,salvage:3,drones:0,titan:true},titan:true,pulse:.7});});
+cell(pl,120,150,'oc',1,function(x){S.player(x,60,110,36,{t:T,facing:0,loadout:{arc:3,chassis:3,salvage:3},oc:true,pulse:1});});
+cell(pl,120,150,'hurt .8',1,function(x){S.player(x,60,110,36,{t:T,facing:0,loadout:{arc:2,chassis:2,salvage:2},hurt:.8});});
+cell(pl,120,150,'face left',1,function(x){S.player(x,60,110,36,{t:T,facing:Math.PI,loadout:{arc:2,chassis:1,salvage:1}});});
+cell(pl,70,70,'r12 x2.4',2.4,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{arc:1,chassis:1,salvage:1}});});
+cell(pl,70,70,'r12 titan',2.4,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{titan:true},titan:true});});
+cell(pl,40,40,'r12 true',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{arc:1,chassis:1,salvage:1}});});
+cell(pl,40,40,'r12 base',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{}});});
+cell(pl,60,60,'r12 titan true',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{titan:true},titan:true});});
+// bots large
+var bl=document.getElementById('bl');
+BOTS.forEach(function(t){[{},{elite:true},{flash:.1},{invuln:true}].forEach(function(o,i){var s=R[t]>=20?2:3;cell(bl,Math.round(R[t]*s*2.9),Math.round(R[t]*s*2.9),i?['','elite','flash','invuln'][i]:t,s,function(x,w,h){S.enemy(x,E(t,w/2,h/2,Object.assign({hostile:/sparker|bomber|turret/.test(t)},o)),1.5);});});});
+// small
+var bs=document.getElementById('bs'),bs2=document.getElementById('bs2');
+BOTS.forEach(function(t){cell(bs,48,48,t,1.08,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{}),1.5);});cell(bs2,Math.max(60,R[t]*2.4*2.4),Math.max(60,R[t]*2.4*2.4),'',2.4,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{}),1.5);});});
+BOTS.slice(0,4).forEach(function(t){cell(bs,48,48,t+' elite',1.08,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{elite:true}),1.5);});});
+// wardens
+var wd=document.getElementById('wd');
+WARD.forEach(function(t){[0,1].forEach(function(w){cell(wd,Math.round(R[t]*3.6),Math.round(R[t]*3.6),t+' w'+w,1.4,function(x,W,H){S.enemy(x,E(t,W/2,H/2,{windup:w,hostile:true,age:2.1}),2.1);});});});
+WARD.forEach(function(t){cell(wd,Math.round(R[t]*2.6),Math.round(R[t]*2.6),t+' true',1.08,function(x,W,H){S.enemy(x,E(t,W/2,H/2,{hostile:true}),2.1);});});
+cell(wd,100,100,'foreman invuln',1.2,function(x,W,H){S.enemy(x,E('foreman',W/2,H/2,{invuln:true}),2.1);});
+// pickups
+var pk=document.getElementById('pk');
+[[1,1.08],[1,4]].forEach(function(sc){var s=sc[1];
+[['bolt1',{kind:'bolt',value:1}],['bolt12',{kind:'bolt',value:12}],['bolt80',{kind:'bolt',value:80}],['bolt1 t2',{kind:'bolt',value:1,age:.6}],['core',{kind:'core',value:1}],['cell',{kind:'cell',value:1}],['blink',{kind:'bolt',value:1,age:12.2}]].forEach(function(p){cell(pk,Math.round(30*s/1.08)+10,Math.round(30*s/1.08)+10,p[0],s,function(x,w,h){S.pickup(x,Object.assign({x:w/2,y:h/2,vx:0,vy:0,age:.3},p[1]),0);});});
+cell(pk,Math.round(30*s/1.08)+10,Math.round(30*s/1.08)+10,'drone',s,function(x,w,h){S.drone(x,w/2,h/2,.4);});
+cell(pk,Math.round(40*s/1.08)+10,Math.round(30*s/1.08)+10,'shot',s,function(x,w,h){S.shot(x,{x:w/2,y:h/2,vx:110,vy:30,r:5,age:0},0);});});
+// icons
+var NAMES='boot coil pulse field fork amp surge chain overload cell thrust recycler capacitor coolant plating spare magnet sorter sweep lucky beacon extract drone dronedmg dronerate collector titan bolt core battery signal lock pause play sound soundOff gear close check blueprint codex log warn arrow nope'.split(' ');
+var ic=document.getElementById('ic');
+NAMES.forEach(function(n){var d=document.createElement('div');d.className='ic';d.innerHTML='<div><span style="color:var(--text)">'+S.icon(n,24)+'</span><span style="color:var(--hazard)">'+S.icon(n,40)+'</span></div>'+n;ic.appendChild(d);});
+// portraits
+var po=document.getElementById('po');
+function pc(w,h,label,k,id,o){var d=document.createElement('div');d.className='c';var c=document.createElement('canvas');c.style.width=w+'px';c.style.height=h+'px';d.appendChild(c);var l=document.createElement('span');l.textContent=label;d.appendChild(l);po.appendChild(d);S.portrait(c,k,id,o);}
+pc(120,120,'player','player',null,{loadout:{arc:2,chassis:2,salvage:2}});
+pc(120,120,'titan','player',null,{loadout:{titan:true},titan:true});
+['scrapling','hauler','turret','overseer','furnace'].forEach(function(t){pc(100,100,t,'enemy',t,{});});
+['gilded','compactor','pylon'].forEach(function(t){pc(100,100,t+' sil','enemy',t,{silhouette:true});});
+
+// ===== ACT II
+Object.assign(R,{repo:12,printer:16,laser:12,firenode:14,auditor:12,mimic:10,forklift:34,firewall:40,inspector:30,vp:36,chairman:44});
+var NB=['repo','printer','laser','firenode','auditor','mimic'],NW=['forklift','firewall','inspector','vp','chairman'];
+var HOST=/repo|laser|auditor|mimic/;
+function E2(t,x,y,o){return E(t,x,y,Object.assign({armor:t==='printer'?.5:0,disguised:false,stolen:0,shieldedBy:null,infected:0,hostile:HOST.test(t)},o||{}));}
+var a2l=document.getElementById('a2l');
+var VAR=[['',{}],['elite',{elite:true}],['flash',{flash:.1}],['shielded',{invuln:true,shieldedBy:9}]];
+NB.forEach(function(t){VAR.forEach(function(v){var s=3;cell(a2l,Math.round(R[t]*s*2.9),Math.round(R[t]*s*2.9),v[0]||t,s,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,v[1]),1.5);});});
+  if(t==='repo')cell(a2l,Math.round(R[t]*3*2.9),Math.round(R[t]*3*2.9),'carrying',3,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{stolen:40}),1.5);});
+  if(t==='mimic'){cell(a2l,90,90,'DISGUISED',3,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{disguised:true}),0.9);});
+    cell(a2l,90,90,'disg blink',3,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{disguised:true,age:0.5}),0.9);});
+    cell(a2l,90,90,'bolt pickup 1.0',3,function(x,w,h){S.pickup(x,{x:w/2,y:h/2,kind:'bolt',value:12,age:.3},0);});}
+  if(t==='laser')cell(a2l,Math.round(R[t]*3*2.9),Math.round(R[t]*3*2.9),'moving',3,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{planted:false,facing:2.4}),1.5);});
+});
+var a2s=document.getElementById('a2s'),a2s2=document.getElementById('a2s2');
+var CMP=['scrapling','roller','sparker','shieldbot','turret','bomber','mite','pylon'].concat(NB);
+CMP.forEach(function(t){cell(a2s,44,44,t,1.08,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{}),1.5);});});
+cell(a2s,44,44,'mimic DISG',1.08,function(x,w,h){S.enemy(x,E2('mimic',w/2,h/2,{disguised:true}),0.9);});
+cell(a2s,44,44,'bolt 12',1.08,function(x,w,h){S.pickup(x,{x:w/2,y:h/2,kind:'bolt',value:12,age:.3},0);});
+cell(a2s,44,44,'repo+sack',1.08,function(x,w,h){S.enemy(x,E2('repo',w/2,h/2,{stolen:9}),1.5);});
+NB.forEach(function(t){cell(a2s2,60,60,t,2.4,function(x,w,h){S.enemy(x,E2(t,w/2,h/2,{}),1.5);});});
+cell(a2s2,60,60,'repo+sack',2.4,function(x,w,h){S.enemy(x,E2('repo',w/2,h/2,{stolen:9}),1.5);});
+cell(a2s2,60,60,'mimic DISG',2.4,function(x,w,h){S.enemy(x,E2('mimic',w/2,h/2,{disguised:true}),0.9);});
+cell(a2s2,60,60,'bolt 12',2.4,function(x,w,h){S.pickup(x,{x:w/2,y:h/2,kind:'bolt',value:12,age:.3},0);});
+cell(a2s2,60,60,'intern',2.4,function(x,w,h){S.intern(x,w/2,h/2,9,.4);});
+cell(a2s,44,44,'intern',1.08,function(x,w,h){S.intern(x,w/2,h/2,9,.4);});
+var a2w=document.getElementById('a2w');
+NW.forEach(function(t){[0,1].forEach(function(w){cell(a2w,Math.round(R[t]*3.6),Math.round(R[t]*3.6),t+' w'+w,1.4,function(x,W,H){S.enemy(x,E2(t,W/2,H/2,{windup:w,hostile:true,age:2.1}),2.1);});});});
+NW.forEach(function(t){cell(a2w,Math.round(R[t]*2.6),Math.round(R[t]*2.6),t+' true',1.08,function(x,W,H){S.enemy(x,E2(t,W/2,H/2,{hostile:true}),2.1);});});
+['compactor','foreman','overseer'].forEach(function(t){cell(a2w,Math.round(R[t]*2.6),Math.round(R[t]*2.6),t+' (act I)',1.08,function(x,W,H){S.enemy(x,E2(t,W/2,H/2,{hostile:true}),2.1);});});
+cell(a2w,110,110,'chairman invuln',1.2,function(x,W,H){S.enemy(x,E2('chairman',W/2,H/2,{invuln:true}),2.1);});
+cell(a2w,110,110,'vp flash',1.2,function(x,W,H){S.enemy(x,E2('vp',W/2,H/2,{flash:.1}),2.1);});
+var co=document.getElementById('col');
+cell(co,120,150,'base',1,function(x){S.player(x,60,110,36,{t:T,loadout:{arc:3,chassis:3,salvage:3}});});
+cell(co,170,160,'titan',1,function(x){S.player(x,85,115,36,{t:T,loadout:{titan:true},titan:true,pulse:.7});});
+cell(co,230,200,'colossus',1,function(x){S.player(x,115,128,36,{t:T,loadout:{colossus:true},colossus:true,pulse:.7});});
+cell(co,230,200,'colossus oc',1,function(x){S.player(x,115,128,36,{t:T,loadout:{colossus:true},colossus:true,oc:true,pulse:1});});
+cell(co,230,200,'colossus hurt',1,function(x){S.player(x,115,128,36,{t:T,colossus:true,hurt:.8,facing:Math.PI});});
+cell(co,70,70,'titan r12',2.4,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,titan:true});});
+cell(co,90,90,'colossus r12*1.3',2.4,function(x,w,h){S.player(x,w/2,h/2+3,12*1.3,{t:T,colossus:true});});
+cell(co,50,50,'base r12',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12,{t:T,loadout:{}});});
+cell(co,60,60,'titan true',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12*1.15,{t:T,titan:true});});
+cell(co,70,70,'colossus true',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12*1.3,{t:T,colossus:true});});
+cell(co,120,150,'intern big',1,function(x){S.intern(x,60,80,36,.4);});
+cell(co,120,150,'intern run',1,function(x){S.intern(x,60,80,36,.9);});
+var N2='fusion supercell dividends lattice storm singularity severance stockopt rehire nanites parachute takeover overtimepay hazardpay classified overtime colossus repo titan'.split(' ');
+var ic2=document.getElementById('ic2');
+N2.forEach(function(n){var d=document.createElement('div');d.className='ic';d.innerHTML='<div><span style="color:var(--text)">'+S.icon(n,18)+'</span><span style="color:var(--text)">'+S.icon(n,24)+'</span><span style="color:var(--hazard)">'+S.icon(n,40)+'</span></div>'+n;ic2.appendChild(d);});
+pc(120,120,'colossus','player',null,{loadout:{colossus:true},colossus:true});
+NB.concat(NW).forEach(function(t){pc(90,90,t,'enemy',t,{});});
+NB.concat(NW).forEach(function(t){pc(90,90,t+' sil','enemy',t,{silhouette:true});});
+
+// ===== ACT III
+Object.assign(R,{spam:6,courier:10,paralegal:12,copier:15,hr:12,receptionist:32,counsel:34,comptroller:40,market:40,founder:46});
+var B3=['spam','courier','paralegal','copier','hr'],W3=['receptionist','counsel','comptroller','market','founder'];
+var a3b=document.getElementById('a3b'),a3b2=document.getElementById('a3b2'),a3w=document.getElementById('a3w'),a3m=document.getElementById('a3m');
+B3.forEach(function(t){var sz=Math.round(R[t]*(t==='spam'?5:3)*2.9);var sc=t==='spam'?5:3;
+ [['',{}],['copy',{copy:true}],['elite',{elite:true}],['flash',{flash:.1}]].forEach(function(v){cell(a3b,sz,sz,v[0]||t,sc,function(x,w,h){S.enemy(x,E(t,w/2,h/2,Object.assign({hostile:t!=='courier',age:2.6},v[1])),1.5);});});
+ cell(a3b2,48,48,t,1.08,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{hostile:true}),1.5);});
+ cell(a3b2,64,64,t,2.4,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{hostile:true}),1.5);});
+ cell(a3b2,64,64,t+' copy',2.4,function(x,w,h){S.enemy(x,E(t,w/2,h/2,{hostile:true,copy:true}),1.5);});});
+cell(a3b2,64,64,'courier <-',2.4,function(x,w,h){S.enemy(x,E('courier',w/2,h/2,{vx:-150}),1.5);});
+cell(a3b2,64,64,'hr healing',2.4,function(x,w,h){S.enemy(x,E('hr',w/2,h/2,{healing:true}),1.5);});
+cell(a3b2,64,64,'paralegal stamp',2.4,function(x,w,h){S.enemy(x,E('paralegal',w/2,h/2,{age:4.5}),1.5);});
+W3.forEach(function(t){var o=t==='market'?[{phase:1},{phase:2}]:[{}];o.forEach(function(ph,i){[0,1].forEach(function(w){cell(a3w,Math.round(R[t]*3.6),Math.round(R[t]*3.6),t+(t==='market'?' P'+(i+1):'')+' w'+w,1.4,function(x,W,H){S.enemy(x,E(t,W/2,H/2,Object.assign({windup:w,hostile:true,age:2.1},ph)),2.1);});});});});
+W3.forEach(function(t){[{phase:1},{phase:2}].slice(0,t==='market'?2:1).forEach(function(ph,i){cell(a3w,Math.round(R[t]*2.6),Math.round(R[t]*2.6),t+' true'+(t==='market'?' P'+(i+1):''),1.08,function(x,W,H){S.enemy(x,E(t,W/2,H/2,Object.assign({hostile:true},ph)),2.1);});});});
+cell(a3w,150,150,'founder P3 eye',1.6,function(x,W,H){S.enemy(x,E('founder',W/2,H/2,{phase:3,hostile:true}),2.1);});
+cell(a3w,150,150,'comptroller flash',1.2,function(x,W,H){S.enemy(x,E('comptroller',W/2,H/2,{flash:.1}),2.1);});
+cell(a3w,150,150,'counsel invuln',1.2,function(x,W,H){S.enemy(x,E('counsel',W/2,H/2,{invuln:true}),2.1);});
+cell(a3m,200,190,'colossus',.9,function(x){S.player(x,111,140,36,{t:T,colossus:true,pulse:.7});});
+cell(a3m,200,190,'MAGNATE',.9,function(x){S.player(x,111,140,36,{t:T,magnate:true,pulse:.7});});
+cell(a3m,200,190,'magnate oc',.9,function(x){S.player(x,111,140,36,{t:T,loadout:{magnate:true,colossus:true},oc:true,pulse:1});});
+cell(a3m,200,190,'magnate hurt left',.9,function(x){S.player(x,111,140,36,{t:T,magnate:true,hurt:.8,facing:Math.PI});});
+cell(a3m,80,80,'magnate r12*1.4',2.4,function(x,w,h){S.player(x,w/2,h/2+3,12*1.4,{t:T,magnate:true});});
+cell(a3m,80,80,'true 1.08',1.08,function(x,w,h){S.player(x,w/2,h/2+3,12*1.4,{t:T,magnate:true});});
+var N3='megacoil diligence legal compound fleet insider orbital expense restructure outsource stake exec founder hold injunction'.split(' '),ic3=document.getElementById('ic3');
+N3.forEach(function(n){var d=document.createElement('div');d.className='ic';d.innerHTML='<div><span style="color:var(--text)">'+S.icon(n,18)+'</span><span style="color:var(--text)">'+S.icon(n,24)+'</span><span style="color:var(--hazard)">'+S.icon(n,40)+'</span></div>'+n;ic3.appendChild(d);});
+var a3p=document.getElementById('a3p');
+function pc3(w,h,label,k,id,o){var d=document.createElement('div');d.className='c';var c=document.createElement('canvas');c.style.width=w+'px';c.style.height=h+'px';d.appendChild(c);var l=document.createElement('span');l.textContent=label;d.appendChild(l);a3p.appendChild(d);S.portrait(c,k,id,o);}
+pc3(110,110,'magnate','player',null,{loadout:{magnate:true}});
+B3.concat(W3).forEach(function(t){pc3(90,90,t,'enemy',t,{});});
+pc3(90,90,'market bear','enemy','market',{phase:2});
+B3.concat(W3).forEach(function(t){pc3(90,90,t+' sil','enemy',t,{silhouette:true});});
+S.icon('nonsense',24);S.enemy(document.createElement('canvas').getContext('2d'),{type:'zzz'},0);S.portrait(null,'enemy','x');S.player(document.createElement('canvas').getContext('2d'),0,0,10,null);
+document.title='ready';
+</script>

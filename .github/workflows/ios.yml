@@ -1,0 +1,69 @@
+# Builds an UNSIGNED Boltyard.ipa on a GitHub cloud Mac.
+# Install it on your iPhone with Sideloadly (it signs the app with your free Apple ID).
+# Runs on every push to main, or by hand: Actions tab -> "Build iPhone app" -> Run workflow.
+name: Build iPhone app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the game page and copy it into the iOS project
+        run: |
+          npm run build:web
+          npx cap sync ios
+
+      - name: Pick Xcode 26 or newer (Capacitor 8 needs it)
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -E 'Xcode_[0-9]+(\.[0-9]+)*\.app$' | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+          MAJOR=$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')
+          if [ "$MAJOR" -lt 26 ]; then echo "::error::Need Xcode 26+, runner has $MAJOR. Change runs-on to macos-26."; exit 1; fi
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -40
+          test -d build/Build/Products/Release-iphoneos/App.app
+
+      - name: Package Boltyard.ipa
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app out/Payload/
+          cd out && zip -qry Boltyard.ipa Payload && ls -la Boltyard.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Boltyard-ipa-build-${{ github.run_number }}
+          path: out/Boltyard.ipa
+          retention-days: 30

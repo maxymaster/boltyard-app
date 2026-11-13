@@ -1,0 +1,204 @@
+<div id="app" class="noshake-off">
+
+  <!-- ===== Shift HUD: a solid strip above the arena ===== -->
+  <header id="hud" class="hud" hidden>
+    <div class="hud-r1 gut">
+      <div id="batt" class="batt" role="meter" aria-label="Battery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <span class="batt-ic" data-icon="battery" data-size="22"></span>
+        <span class="bar"><i id="battFill"></i><span id="battBud" class="bud">Budget cut</span></span>
+        <b id="battNum" class="num">15</b>
+      </div>
+      <button id="btnFocusHud" class="iconbtn focusbtn" type="button" aria-label="Focus mode" aria-pressed="false" data-focus="1"></button>
+      <button id="btnPause" class="iconbtn" type="button" aria-label="Pause" data-icon="pause" data-size="22"></button>
+    </div>
+    <div class="hud-r2 gut">
+      <div id="hudBoltsBox" class="hud-bolts">
+        <span class="hz" data-icon="bolt" data-size="18"></span><b id="hudBolts" class="num">0</b>
+        <span id="hudCoreWrap" class="hud-cores" hidden><span data-icon="core" data-size="18"></span><b id="hudCores" class="num">0</b></span>
+      </div>
+      <div id="hudOc" class="hud-oc" hidden><span id="ocLabel">OC</span><span class="bar"><i id="ocFill"></i></span></div>
+      <div id="hudSig" class="hud-sig" data-mode="fill">
+        <span id="sigIcon" class="sig-ic" data-icon="signal" data-size="16"></span>
+        <span id="sigLabel" class="sig-label">Signal</span>
+        <span class="bar"><i id="sigFill"></i></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== The arena ===== -->
+  <main id="stage" class="stage">
+    <canvas id="arena" aria-label="Arena"></canvas>
+    <div id="warn" class="warn" hidden role="alert">
+      <span class="warn-k">Warden inbound</span>
+      <span id="warnName" class="warn-n">The Compactor</span>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+    <div id="hint" class="hint" hidden>
+      <span class="thumb" aria-hidden="true"></span>
+      <p id="hintText">Drag anywhere to steer Sprocket.</p>
+    </div>
+  </main>
+
+  <!-- ===== Title ===== -->
+  <section id="title" class="screen title" hidden aria-label="Title">
+    <div class="title-top gut">
+      <p class="sign">Yard 9 &middot; Night shift</p>
+      <h1 class="logo">BOLTYARD</h1>
+      <p class="premise">Yard 9 has woken up. Sprocket has a shift to work.</p>
+      <p class="premise how">Drag to steer. The arc zaps by itself.</p>
+    </div>
+    <div class="title-bot gut">
+      <button id="btnFocusTitle" class="iconbtn focusbtn" type="button" aria-label="Focus mode" aria-pressed="false" data-focus="1"></button>
+      <button id="btnTitleSound" class="iconbtn" type="button" aria-label="Sound on" data-icon="sound" data-size="22"></button>
+      <button id="btnTitleClock" class="cta" type="button"><span>Clock in</span></button>
+    </div>
+  </section>
+
+  <!-- ===== Workshop ===== -->
+  <section id="workshop" class="screen ws" hidden aria-label="Workshop">
+    <div class="ws-top gut">
+      <canvas id="portrait" class="portrait" aria-label="Sprocket"></canvas>
+      <div class="ws-head">
+        <div class="cur bolts" aria-label="Bolts"><span class="hz" data-icon="bolt" data-size="22"></span><b id="wsBolts" class="num">0</b></div>
+        <div class="cur cores" id="wsCoreWrap" aria-label="Cores" hidden><span class="cr" data-icon="core" data-size="22"></span><b id="wsCores" class="num">0</b></div>
+        <button id="btnSecBar" class="secbar" type="button" aria-expanded="false" aria-label="Sector and stats, tap to open"><span id="secBarT">S1</span></button>
+        <span class="grow"></span>
+        <button id="btnFocusWs" class="iconbtn focusbtn" type="button" aria-label="Focus mode" aria-pressed="false" data-focus="1"></button>
+        <button id="btnGear" class="iconbtn" type="button" aria-label="Settings" data-icon="gear" data-size="22"></button>
+      </div>
+      <dl class="stats" id="stats">
+        <div><dt>Dmg/s</dt><dd id="stDps">1.0</dd></div>
+        <div><dt>Battery</dt><dd id="stBat">18</dd></div>
+        <div><dt>Field</dt><dd id="stField">46</dd></div>
+        <div><dt>Bolts</dt><dd id="stBolt">&times;1.00</dd></div>
+      </dl>
+    </div>
+
+    <div class="ws-sectors gut">
+      <div id="secActs" class="sec-acts" role="tablist" aria-label="Act" hidden></div>
+      <div id="secTiles" class="sec-tiles" role="radiogroup" aria-label="Sector"></div>
+      <p id="secInfo" class="sec-info"></p>
+    </div>
+
+    <div class="ws-tabs gut" role="tablist">
+      <button id="tabBtnBp" class="tab" role="tab" type="button" aria-selected="true" data-tab="bp"><span data-icon="blueprint" data-size="18"></span>Blueprint<em id="bpBadge" class="badge" hidden>0</em></button>
+      <button id="tabBtnCodex" class="tab" role="tab" type="button" aria-selected="false" data-tab="codex"><span data-icon="codex" data-size="18"></span>Codex</button>
+      <button id="tabBtnLog" class="tab" role="tab" type="button" aria-selected="false" data-tab="log"><span data-icon="log" data-size="18"></span>Log</button>
+    </div>
+
+    <div id="pane" class="pane">
+      <div id="tabBp" class="tabpane"><nav id="bpJump" class="bp-jump" aria-label="Blueprint sections"></nav><div id="bp" class="bp"></div>
+        <div class="bp-ctl">
+          <button id="bpZoomIn" class="mapbtn" type="button" aria-label="Zoom in"></button>
+          <button id="bpZoomOut" class="mapbtn" type="button" aria-label="Zoom out"></button>
+          <button id="bpHome" class="mapbtn" type="button" aria-label="Recentre on Sprocket"></button>
+        </div>
+      </div>
+      <div id="tabCodex" class="tabpane gut" hidden></div>
+      <div id="tabLog" class="tabpane gut" hidden></div>
+    </div>
+
+    <div id="fund" class="fund gut" hidden aria-live="polite"><div class="fund-t"><b id="fundT">Takeover fund 0%</b><span id="fundS"></span></div><span class="fund-bar"><i id="fundFill"></i></span></div>
+
+    <div id="sheet" class="nsheet" hidden role="dialog" aria-label="Upgrade details">
+      <div class="ns-in gut">
+        <div class="ns-head">
+          <span id="nsIcon" class="ns-ic"></span>
+          <div class="ns-title"><b id="nsName">Coil Voltage</b><span class="ns-meta"><span id="nsBranch" class="ns-branch">Arc</span><span id="nsLevel" class="ns-lv">Level 0 of 25</span></span></div>
+          <button id="nsClose" class="iconbtn sm" type="button" aria-label="Close details" data-icon="close" data-size="18"></button>
+        </div>
+        <div id="nsTrack" class="ns-track" aria-hidden="true"></div>
+        <p id="nsDesc" class="ns-desc"></p>
+        <div class="ns-now"><div class="nt"><small>Now</small><span id="nsNow">+0 damage</span></div><span class="ns-ar" data-icon="arrow" data-size="16"></span><div class="nt nx"><small>Next</small><b id="nsNext">+1 damage</b></div></div>
+        <ul id="nsReq" class="ns-req" hidden></ul>
+        <div id="nsCost" class="ns-cost"></div>
+        <div class="ns-buy">
+          <button id="btnBuy" class="btn-hz" type="button">Bolt on</button>
+          <button id="btnMax" class="btn-max" type="button">Max</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="wsBanner" class="ws-banner gut" hidden><b id="wsBannerT">Management has noticed</b><span id="wsBannerS">R&amp;D declassified</span></div>
+
+    <div class="ws-dock gut">
+      <button id="btnClockIn" class="cta" type="button"><span id="clockLabel">Clock in &mdash; Sector 1</span></button>
+    </div>
+  </section>
+
+  <!-- ===== Pause ===== -->
+  <section id="pause" class="overlay" hidden aria-label="Paused">
+    <div class="scrim"></div>
+    <div class="sheet gut">
+      <h2 class="sheet-h">Paused</h2>
+      <button id="btnResume" class="btn-hz" type="button">Resume</button>
+      <button id="btnClockOut" class="btn-rust" type="button">Clock out<small>Keeps what you collected.</small></button>
+      <button id="swPauseSound" class="sw" type="button" role="switch" aria-checked="true"><span>Sound</span><i class="sw-track"><i class="sw-knob"></i></i></button>
+    </div>
+  </section>
+
+  <!-- ===== Shift report ===== -->
+  <section id="report" class="overlay rep" hidden aria-label="Shift report">
+    <div class="scrim light"></div>
+    <div class="rep-wrap">
+      <div class="card">
+        <div class="card-head gut">
+          <span class="card-t">Shift report</span>
+          <span id="repNo" class="card-no">No. 0001</span>
+        </div>
+        <div class="card-sign gut"><span id="repSector">Yard 9 &middot; Sector 01 &middot; Conveyor Yard</span></div>
+        <div class="card-stamp gut">
+          <div id="repStamp" class="stamp">BATTERY FLAT</div>
+          <p id="repLine" class="rep-line">Sprocket was towed back to the workshop.</p>
+        </div>
+        <div id="repUnlock" class="rep-unlock gut" hidden></div>
+        <div id="repRows" class="rows gut"></div>
+        <p id="repNew" class="rep-new gut" hidden></p>
+        <p id="repNext" class="rep-next gut"></p>
+      </div>
+      <div class="rep-foot gut">
+        <button id="btnRepPrimary" class="btn-hz" type="button">Workshop</button>
+        <button id="btnRepSecond" class="btn-ghost" type="button">Clock in again</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Victory ===== -->
+  <section id="victory" class="overlay rep vic" hidden aria-label="Yard secured">
+    <div class="scrim"></div>
+    <div class="rep-wrap">
+      <div class="card">
+        <div class="card-head gut"><span class="card-t">Final shift report</span><span class="card-no">Yard 9</span></div>
+        <div class="card-stamp gut">
+          <div id="vicStamp" class="stamp ok">YARD 9 SECURED</div>
+          <div id="vicStamp2" class="stamp s2">MANAGEMENT HAS NOTICED</div>
+          <p id="vicLine" class="rep-line"><span id="vicLine1">The Overseer is scrap. Management <span id="vicXo" class="xo">has not noticed yet</span>.</span> <b id="vicFix" class="vic-fix" hidden>Management has noticed. Report to Loading Dock B.</b></p>
+        </div>
+        <div id="vicUnlock" class="rep-unlock gut" hidden></div>
+        <div id="vicRows" class="rows gut"></div>
+      </div>
+      <div class="rep-foot gut">
+        <button id="btnKeep" class="btn-hz" type="button">Keep playing</button>
+        <button id="btnVic2" class="btn-ghost" type="button" hidden>Workshop</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Settings ===== -->
+  <section id="settings" class="overlay" hidden aria-label="Settings">
+    <div id="settingsScrim" class="scrim"></div>
+    <div class="sheet gut">
+      <div class="sheet-hr"><h2 class="sheet-h">Settings</h2><button id="btnSetClose" class="iconbtn sm" type="button" aria-label="Close settings" data-icon="close" data-size="18"></button></div>
+      <button id="swSound" class="sw" type="button" role="switch" aria-checked="true"><span>Sound</span><i class="sw-track"><i class="sw-knob"></i></i></button>
+      <button id="swFocus" class="sw" type="button" role="switch" aria-checked="false"><span>Focus mode<small id="focusNote">Goes fullscreen when you clock in. Touch guards are always on during a shift.</small></span><i class="sw-track"><i class="sw-knob"></i></i></button>
+      <button id="swShake" class="sw" type="button" role="switch" aria-checked="true"><span>Screen shake<small id="shakeNote" hidden>Off while your device asks for reduced motion.</small></span><i class="sw-track"><i class="sw-knob"></i></i></button>
+      <ol class="howto">
+        <li>Drag anywhere to steer Sprocket. Arc fires on its own.</li>
+        <li>Scrap bots and grab bolts before the battery runs flat.</li>
+        <li>Spend bolts in the Workshop. Scrap enough bots and a Warden turns up.</li>
+      </ol>
+      <button id="btnReset" class="btn-ghost danger" type="button">Reset progress</button>
+    </div>
+  </section>
+  <div id="sysNote" class="sysnote" role="status" aria-live="polite" hidden></div>
+</div>

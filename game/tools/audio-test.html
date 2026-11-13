@@ -1,0 +1,242 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Boltyard audio test</title></head>
+<body style="font:13px monospace;background:#0e1a21;color:#eaf2f4">
+<pre id="out">audio harness: call window.AT.* from the Playwright script (tools/audio-test.js)</pre>
+<script src="../src/audio.js"></script>
+<script>
+(function () {
+  var SR = 44100;
+  var A = BY.Audio;
+
+  function oc(sec) { return new OfflineAudioContext(1, Math.floor(SR * sec), SR); }
+
+  async function render(sec, fn) {
+    var c = oc(sec);
+    A._useContext(c);
+    A._resetStats();
+    fn();
+    var buf = await c.startRendering();
+    return buf.getChannelData(0);
+  }
+
+  function fft(re, im) {                       // in-place radix-2
+    var n = re.length, i, j = 0, k, t;
+    for (i = 1; i < n; i++) {
+      var bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (var len = 2; len <= n; len <<= 1) {
+      var ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (i = 0; i < n; i += len) {
+        var cr = 1, ci = 0;
+        for (k = 0; k < len / 2; k++) {
+          var ur = re[i + k], ui = im[i + k];
+          var vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci;
+          var vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
+          re[i + k] = ur + vr; im[i + k] = ui + vi;
+          re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+          var nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+  }
+
+  function analyse(d) {
+    var n = d.length, peak = 0, i, first = -1, last = -1, thr = Math.pow(10, -50 / 20), bad = 0;
+    for (i = 0; i < n; i++) {
+      var a = Math.abs(d[i]);
+      if (a !== a || !isFinite(a)) { bad++; continue; }
+      if (a > peak) peak = a;
+      if (a > thr) { if (first < 0) first = i; last = i; }
+    }
+    var N = 131072, re = new Float64Array(N), im = new Float64Array(N);
+    for (i = 0; i < N && i < n; i++) re[i] = d[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)));
+    fft(re, im);
+    var tot = 0, lo = 0, hi = 0, mid = 0, bestK = 1, bestV = 0, df = SR / N;
+    for (i = 1; i < N / 2; i++) {
+      var p = re[i] * re[i] + im[i] * im[i], f = i * df;
+      tot += p;
+      if (f < 160) lo += p; else if (f > 4000) hi += p;
+      if (f > 40 && p > bestV) { bestV = p; bestK = i; }
+    }
+    return {
+      peak: peak, dur: first < 0 ? 0 : (last - first) / SR, onset: first < 0 ? null : first / SR,
+      firstSample: d[Math.max(first, 0)] || 0,
+      lowPct: tot ? 100 * lo / tot : 0, hiPct: tot ? 100 * hi / tot : 0, domHz: bestK * df, bad: bad
+    };
+  }
+
+  window.AT = {
+    unlockReal: async function () {
+      var thrown = null;
+      try { A.unlock(); A.unlock(); A.play('unlock'); } catch (e) { thrown = String(e); }
+      await new Promise(function (r) { setTimeout(r, 200); });
+      return { thrown: thrown, state: A._state() };
+    },
+
+    names: function () { return A.names.slice(); },
+
+    sound: async function (name, opts) {
+      var thrown = null, d;
+      try { d = await render(4.5, function () { A.play(name, opts); }); } catch (e) { thrown = String(e); }
+      if (thrown) return { name: name, thrown: thrown };
+      var r = analyse(d); r.name = name; r.errors = A._stats.errors; r.lastError = A._state().lastError;
+      r.osc = A._stats.osc; r.noise = A._stats.noise;
+      return r;
+    },
+
+    stress: async function () {
+      var ev = [], i, thrown = null;
+      var srcs = ['arc', 'drone', 'chain'];
+      for (i = 0; i < 40; i++) ev.push({ type: 'zap', x1: 0, y1: 0, x2: 10, y2: 10, crit: i % 7 === 0, src: srcs[i % 3] });
+      for (i = 0; i < 25; i++) ev.push({ type: 'kill', x: 5, y: 5, r: i % 5 === 0 ? 22 : 12, enemyType: 'scrapling', elite: i % 9 === 0, boss: false, bolts: 3 });
+      for (i = 0; i < 60; i++) ev.push({ type: 'pickup', kind: i % 20 === 0 ? 'core' : 'bolt', value: 1, x: 1, y: 1 });
+      var d, st;
+      try {
+        d = await render(4, function () { A._trace = []; A.handle(ev, { attract: false }); });
+      } catch (e) { thrown = String(e); }
+      var trace = A._trace || []; A._trace = null;
+      if (thrown) return { thrown: thrown };
+      st = JSON.parse(JSON.stringify(A._stats));
+      var a = analyse(d);
+      var pk = trace.filter(function (x) { return x.name === 'pickup'; });
+      // oscillator/noise voices started
+      return { thrown: null, events: ev.length, peak: a.peak, dur: a.dur, sounds: st.sounds, byName: st.byName, dropped: st.dropped,
+               osc: st.osc, noise: st.noise, errors: st.errors, bad: a.bad };
+    },
+
+    // a 'realistic worst frame': stress plus critical events, which must bypass the budget
+    mixed: async function () {
+      var ev = [], i;
+      for (i = 0; i < 30; i++) ev.push({ type: 'kill', r: 12, elite: false });
+      ev.push({ type: 'hurt', amount: 5, src: 'shot' }, { type: 'bossDead', name: 'X' }, { type: 'end', reason: 'victory' },
+              { type: 'explode', src: 'overload' }, { type: 'slam' });
+      for (i = 0; i < 20; i++) ev.push({ type: 'explode', src: 'overload' });
+      var d = await render(4, function () { A.handle(ev, {}); });
+      var st = JSON.parse(JSON.stringify(A._stats)); var a = analyse(d);
+      return { peak: a.peak, sounds: st.sounds, byName: st.byName, dropped: st.dropped, errors: st.errors };
+    },
+
+    ladder: async function () {
+      var c = oc(3); A._useContext(c); A._resetStats(); A._trace = [];
+      var times = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 2.5, 2.6, 2.7];
+      times.forEach(function (t) { A.play('pickup', { at: t }); });
+      var tr = A._trace.filter(function (x) { return x.name === 'pickup'; });
+      var f = [], j; for (j = 0; j < tr.length; j += 3) f.push(Math.round(tr[j].f * 10) / 10); // 3 oscillator/noise-less: sine,tri per call (noise not traced)
+      A._trace = null;
+      return { fundamentals: tr.filter(function (x, k) { return k % 2 === 0; }).map(function (x) { return { t: x.t, f: Math.round(x.f * 10) / 10 }; }) };
+    },
+
+    pitchOpt: async function () {
+      var c = oc(1); A._useContext(c); A._trace = [];
+      A.play('combo', { pitch: 1 }); A.play('combo', { pitch: 1.5 }); A.play('combo', { pitch: 99 }); A.play('combo', { pitch: -3 });
+      A.play('combo', { pitch: 'x', vol: 'y' });
+      var r = A._trace.filter(function (x, k) { return k % 2 === 0; }).map(function (x) { return Math.round(x.f); });
+      A._trace = null; return r;
+    },
+
+    disabled: async function () {
+      var out = {}, d;
+      d = await render(4.5, function () { A.play('killBig'); A.handle([{ type: 'kill', r: 30 }], {}); A.setEnabled(false); });
+      out.scheduledThenDisabled = analyse(d).peak;
+      d = await render(4.5, function () { A.setEnabled(false); A.play('zap'); A.play('bossDead'); A.handle([{ type: 'bossDead' }, { type: 'zap', src: 'arc' }], {}); });
+      out.disabledPlay = analyse(d).peak;
+      A.setEnabled(true);
+      d = await render(4.5, function () { A.play('zap'); });
+      out.reenabledZap = analyse(d).peak;
+      return out;
+    },
+
+    handleMap: async function () {
+      // each event type alone: how many sounds start
+      var T = {
+        pulse: { type: 'pulse', x: 1, y: 1, r: 40 }, zap: { type: 'zap', crit: false, src: 'arc' }, zapDrone: { type: 'zap', src: 'drone' },
+        zapChain: { type: 'zap', src: 'chain' }, zapCrit: { type: 'zap', crit: true, src: 'arc' }, hit: { type: 'hit' },
+        kill: { type: 'kill', r: 12 }, killElite: { type: 'kill', r: 12, elite: true }, killBigR: { type: 'kill', r: 22 }, killBoss: { type: 'kill', r: 40, boss: true },
+        explode: { type: 'explode', src: 'bomber' }, spawn: { type: 'spawn' }, pickupBolt: { type: 'pickup', kind: 'bolt' },
+        pickupCore: { type: 'pickup', kind: 'core' }, pickupCell: { type: 'pickup', kind: 'cell' }, hurt: { type: 'hurt', amount: 3, src: 'contact' },
+        shot: { type: 'shot' }, lowBattery: { type: 'lowBattery' }, spare: { type: 'spare' }, ocStart: { type: 'ocStart', dur: 4 }, ocEnd: { type: 'ocEnd' },
+        combo: { type: 'combo', n: 10 }, bossWarn: { type: 'bossWarn', name: 'x', dur: 2.5 }, bossSpawn: { type: 'bossSpawn' }, bossPhase: { type: 'bossPhase', phase: 2 },
+        telegraph: { type: 'telegraph', kind: 'slam' }, slam: { type: 'slam' }, shield: { type: 'shield', on: true }, bossDead: { type: 'bossDead' },
+        sectorClear: { type: 'sectorClear' }, endBattery: { type: 'end', reason: 'battery' }, endClock: { type: 'end', reason: 'clockout' }, endVictory: { type: 'end', reason: 'victory' },
+        laser: { type: 'laser', x: 1, y: 1, x2: 5, y2: 5, w: 4 }, storm: { type: 'storm', n: 3 }, wellOpen: { type: 'wellOpen', id: 1, x: 1, y: 1, r: 40 },
+        wellBoom: { type: 'wellBoom', id: 1, x: 1, y: 1, r: 40, n: 3 }, steal: { type: 'steal', enemyId: 2, x: 1, y: 1, bolts: 5 },
+        refund: { type: 'refund', x: 1, y: 1, bolts: 5 }, intern: { type: 'intern', id: 1, x: 1, y: 1 }, internEnd: { type: 'internEnd', id: 1, x: 1, y: 1 },
+        infect: { type: 'infect', enemyId: 2 }, stock: { type: 'stock', n: 1, mult: 1.2 }, severance: { type: 'severance', x: 1, y: 1, r: 80, bolts: 30 },
+        overtime: { type: 'overtime', level: 2 }, budgetOn: { type: 'budget', on: true }, budgetOff: { type: 'budget', on: false },
+        blink: { type: 'blink', enemyId: 2, x: 1, y: 1 }, print: { type: 'print', enemyId: 2 }, mimicWake: { type: 'mimicWake', enemyId: 2 },
+        classified: { type: 'classified' },
+        hold: { type: 'hold' }, injunction: { type: 'injunction' }, clawback: { type: 'clawback' }, orbital: { type: 'orbital' },
+        burst: { type: 'burst' }, copy: { type: 'copy' }, founder: { type: 'founder' }
+      };
+      var res = {}, k;
+      for (k in T) {
+        await render(0.1, function () { A.handle([T[k]], {}); });
+        res[k] = Object.keys(A._stats.byName).join('+') || '-';
+      }
+      return res;
+    },
+
+    // every new Act II event in an attract run must be silent
+    attract: async function () {
+      var ev = [{ type: 'storm', n: 3 }, { type: 'severance', x: 1, y: 1, r: 80, bolts: 30 }, { type: 'laser', x: 1, y: 1, x2: 5, y2: 5, w: 4 },
+                { type: 'overtime', level: 1 }, { type: 'budget', on: true }, { type: 'wellBoom', id: 1, x: 1, y: 1, r: 40, n: 3 },
+                { type: 'intern', id: 1, x: 1, y: 1 }, { type: 'print', enemyId: 2 },
+                { type: 'hold' }, { type: 'injunction' }, { type: 'clawback' }, { type: 'orbital' }, { type: 'burst' }, { type: 'copy' },
+                { type: 'founder' }];
+      var d = await render(2, function () { A.handle(ev, { attract: true }); });
+      return { sounds: A._stats.sounds, peak: analyse(d).peak };
+    },
+
+    // 10 storm + 10 intern + 10 print per call, two calls, all in one frame: each must start once
+    rate: async function () {
+      await render(2, function () {
+        var s = [], i;
+        for (i = 0; i < 10; i++) s.push({ type: 'storm', n: 3 }, { type: 'intern', id: i, x: 1, y: 1 }, { type: 'print', enemyId: i },
+                                        { type: 'burst' }, { type: 'copy' });
+        A.handle(s, {}); A.handle(s, {});
+      });
+      var b = JSON.parse(JSON.stringify(A._stats.byName));
+      return { storm: b.storm || 0, intern: b.intern || 0, print: b.print || 0, burst: b.burst || 0, copy: b.copy || 0 };
+    },
+
+    robustness: function () {
+      var out = [], thrown = [];
+      function t(label, f) { try { f(); } catch (e) { thrown.push(label + ': ' + e); } }
+      A._useContext(null);
+      t('play-no-ctx', function () { A.play('zap'); A.play('nope'); A.play(); A.play(null, null); A.play(5); });
+      t('handle-no-ctx', function () { A.handle([{ type: 'kill' }]); A.handle(); A.handle(null); A.handle(undefined, null); A.handle([], {}); A.handle('x'); A.handle([null, 3, 'a', {}, { type: 5 }], null); });
+      t('setEnabled', function () { A.setEnabled(false); A.setEnabled(true); A.setEnabled(); A.setEnabled(true); });
+      // fake closed context
+      var fake = { state: 'closed', currentTime: 0, sampleRate: 44100, destination: {}, createGain: function () { throw new Error('x'); } };
+      t('closed', function () { A._useContext(fake); A.play('zap'); A.handle([{ type: 'zap' }], {}); A.unlock(); });
+      var c = oc(1); A._useContext(c);
+      t('offline-ok', function () { A.play('zap'); A.handle(undefined); A.handle([]); A.handle([{ type: 'zap' }], undefined); });
+      return { thrown: thrown };
+    },
+
+    realLeak: async function () {
+      // real context: 150 frames of busy events, then wait for voices to finish
+      A._useContext(null);
+      A.unlock();
+      A._resetStats();
+      var st0 = A._state();
+      var ev = [];
+      for (var i = 0; i < 10; i++) ev.push({ type: 'zap', src: 'arc' }, { type: 'kill', r: 12 }, { type: 'pickup', kind: 'bolt' });
+      var maxActive = 0;
+      for (var f = 0; f < 150; f++) {
+        A.handle(ev, {});
+        if (A._stats.active > maxActive) maxActive = A._stats.active;
+        await new Promise(function (r) { setTimeout(r, 16); });
+      }
+      var s1 = JSON.parse(JSON.stringify(A._stats));
+      await new Promise(function (r) { setTimeout(r, 1500); });
+      var s2 = JSON.parse(JSON.stringify(A._stats));
+      return { stateBefore: st0, stateAfter: A._state(), maxActive: maxActive, started: { sounds: s1.sounds, osc: s1.osc, noise: s1.noise }, activeAfterWait: s2.active, errors: s2.errors };
+    }
+  };
+})();
+</script>
+</body></html>

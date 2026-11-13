@@ -1,0 +1,12 @@
+{
+  "name": "boltyard-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Boltyard iPhone app (Capacitor wrapper around the single-page game)",
+  "scripts": {
+    "build:web": "node game/tools/build.js --app && cp game/dist-app/index.html www/index.html",
+    "sync": "npm run build:web && npx cap sync ios"
+  },
+  "dependencies": { "@capacitor/core": "8.6.2", "@capacitor/ios": "8.6.2" },
+  "devDependencies": { "@capacitor/cli": "8.6.2" }
+}
