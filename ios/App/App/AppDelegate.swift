@@ -54,7 +54,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class GameViewController: CAPBridgeViewController {
     override var prefersStatusBarHidden: Bool { true }
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { [.top, .bottom] }
-    override var prefersHomeIndicatorAutoHidden: Bool { false }
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
