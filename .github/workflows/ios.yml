@@ -15,7 +15,7 @@ on:
         options: [macos-15, macos-26, macos-15-intel]
 
 concurrency:
-  group: ios-build
+  group: ios-build-${{ inputs.runner || 'macos-15' }}
   cancel-in-progress: true
 
 jobs:
