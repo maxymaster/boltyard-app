@@ -1,7 +1,78 @@
-# BOLTYARD — build spec (v1)
+# BOLTYARD — build spec
 
-Single source of truth for every agent on this build. Read all of it before writing code.
-If something here is ambiguous, pick the simplest reading, note it in your final report, and keep going.
+**Read §0 first.** It describes the game as it is built today (v1.0, build 6) and wins over everything below it.
+§1–§12 are the original contracts in the order they were written (v1 Act I, then the 9b–9d notes, §11 Act II, §12 Act III
+with its 12.14–12.16 addenda); each later section overrides earlier ones. They are kept for the detailed tables, event
+names and the reasoning behind the numbers. If something is ambiguous, pick the simplest reading and say so in your report.
+
+## 0. How the game is built (current)
+
+**What it is.** A phone-first, portrait, active incremental: short shifts you are meant to fail, a gated upgrade map
+between them, a Warden per sector. Three acts, 15 sectors + endless Overtime (sector 16), 15 Wardens, 22 bot types,
+66 upgrades in 7 branches (core, arc, chassis, salvage, drones, `rnd` = Act II, `exec` = Act III). About 1 h per act for an
+attentive player. One self-contained page (~590 KB), no assets: art is canvas code, sound is WebAudio synthesis.
+
+**Where the truth lives.**
+| Thing | Source of truth | Notes |
+|---|---|---|
+| Every number, name, description, tree position | `src/data.js` (`BY.Data`, `BY.Fmt`) | The tables in §4, §11, §12.3–12.8 are *historical starting values*. |
+| Rules | `src/engine.js` (`BY.Engine`) | Pure, deterministic per seed, no DOM. API: `newSave loadSave stats loadout upgradeInfo buy affordableCount sectorInfo startShift step clockOut endShift cost spawn needFor`. Run-state and event names: §5.3/5.4 + §11.9/11.10 + §12.9/12.10. |
+| Art | `src/sprites.js` (`BY.Sprites`) | Procedural, cached. |
+| Sound | `src/audio.js` (`BY.Audio`) | Unlocks on the first tap. |
+| Arena canvas | `src/render.js` (`BY.Render`) | Reads run state + events only. Arena is 360 units wide; its height follows the canvas aspect. |
+| Everything else on screen | `src/shell.html`, `src/style.css`, `src/ui.js` (`BY.UI`) | ui.js sections in order: helpers/save, title, shift (input, HUD), report/victory, workshop (sectors, Blueprint map, sheet, codex, log), settings, Focus mode, boot, `BY.UI.debug` test hook. |
+| Build | `tools/build.js` → `dist/index.html` (host page contract, §8) and `dist/test.html` (same, in the host skeleton) | Script order: data, engine, sprites, audio, render, ui. The native build prepends `src/native.js` (owned by the app wrapper, not part of the web build). |
+
+Module pattern, tooling and file rules: §2 (still current). Visual direction: §7 (still current).
+
+**Screens as built** (where this differs from §8, this wins):
+- **Title** (first visit only): logo, premise, one how-to line, CLOCK IN, sound toggle, live attract shift behind.
+- **Shift**: the HUD is a solid strip *above* the arena (battery + pause; bolts, cores, OC chip, Warden signal/HP), never
+  an overlay. Relative-drag steering. Touch guards (§12.14) are always on. Pause sheet: Resume / Clock out / Sound.
+- **Shift report** → Workshop or Clock in again; act finales use the Victory card (`gameWon`, `act2Won`, `act3Won`).
+- **Workshop**: on the Blueprint tab the header is *slim* (currencies, sector button, settings; the sector button opens
+  the portrait/stat strip and the sector picker with act tabs). The Blueprint is a pannable, zoomable radial map
+  (§12.15c) with a I/II/III jump bar, zoom/recentre buttons and a detail sheet docked above CLOCK IN (Bolt on with
+  hold-to-repeat, Max). Codex and Log tabs show the full header. A Takeover-fund bar appears above the dock when relevant.
+- **Settings**: Sound, Focus mode (web only), Screen shake, how-to, two-step Reset, version line
+  (`VERSION`/`BUILD` at the top of ui.js; the wrapper may override the text with `window.BY_VERSION`).
+
+**Save.** `localStorage['boltyard.save.v1']` holds the current schema (`v: 3`; `E.loadSave` migrates v1/v2 and sanitises).
+`boltyard.save.bak` keeps an unreadable save; `boltyard.focus.v1` remembers the Focus choice (web). Every access is in
+try/catch; the game runs without storage. Saved after each purchase, `endShift` and settings change. Hidden page →
+pause; `pagehide` mid-shift → `endShift` + save. A paused shift that is killed in the background loses that shift only.
+
+**Two hosts, one page.**
+- *Web / claude.ai viewer* (default): the host wraps the file and pads `:root` by the safe-area insets; `#app` sits in
+  that box. Page contract in §8 applies unchanged. Focus mode (§12.14) offers fullscreen and asks for a wake lock.
+- *Native iPhone app* (Capacitor, WKWebView): the wrapper sets `window.BY_NATIVE = true` before the game scripts.
+  ui.js reads it once (`NATIVE`), adds `html.native`, hides the three Focus buttons and the Focus switch, and makes no
+  fullscreen or wake-lock request and shows no "refused" notes (the shell is already fullscreen, portrait and awake).
+  The touch guards still run. CSS under `html.native` (end of style.css): `#app` is `position: fixed` over the whole
+  screen and the edge bars (HUD, title bars, workshop header and dock, sheets, report footer) pad themselves with
+  `env(safe-area-inset-top/bottom)` via `--sat`/`--sab`, so their backgrounds run under the Dynamic Island and home
+  indicator; the arena stops above the home indicator; pinch/double-tap zoom is off everywhere. The wrapper's page
+  needs `viewport-fit=cover`. Nothing may depend on the network.
+- Any new browser-only affordance must be keyed off `NATIVE` the same way; any new bar fixed to the top or bottom edge
+  must add `var(--sat)` / `var(--sab)` under `html.native`.
+
+**Frozen balance.** Act I: `node tools/simbot.js --runs 8 --quiet` must equal `tools/baseline-act1.txt` (ignore `cpu:`).
+Acts II/III: numbers as shipped in §12.16 (latest addendum wins). Change balance only on request, and re-baseline.
+
+**Tests** (all must stay green; numbers as of build 6):
+`test-engine.js` (18,887 checks) · `check-contract.js` (33) · `robustness.js` · `tree-check.js` · `audio-test.js` ·
+`play-through.js` · `native-check.js` (21: native flag on/off) · `ui-test.js --real --phase=a,b,c,d,e` then `f`, `g`,
+`h`, `i` (long; run phases separately; without `--real` it leaves a stub-render build, so rebuild afterwards).
+Screenshots: `shots-review.js <tag> [--native]` (390×844 @2x with a simulated notch/home-indicator safe area),
+`shots.js`, `shots-act3.js`, `render-*-shot.js`.
+
+**Known leftovers** (harmless, not yet cleaned up): `legacyReq` on the three capstones in data.js is read by nothing;
+style.css is layered (later blocks override earlier ones for `.nsheet`, `.cur`, `.ws-head`), so search the whole file
+before changing a rule.
+
+---
+
+# Original contracts (historical order)
 
 ## 1. What we are making
 
@@ -963,6 +1034,8 @@ WOULD LIKE A WORD"); Founder finale card ("FOUNDER'S DAY" stamp, line "Sprocket 
    ≥ 44 px; text contrast AA; 320–430 px wide, no horizontal scroll.
 
 ### 12.14 Focus mode (fullscreen) — UI, added at the user's request ("no misinputs")
+**Native app:** with `window.BY_NATIVE` set only the *Focus guards* below apply; the Focus button, the Settings switch, the
+fullscreen request, the wake lock and the refusal notes are all off (see §0 "Two hosts, one page").
 The game runs inside the claude.ai artifact viewer (an iframe; fullscreen may be refused, and iPhone Safari has no
 element fullscreen at all), so this is two layers:
 - **Focus button** (icon `focus`, in the shift HUD next to Pause, and on the title and workshop headers). Tap: try

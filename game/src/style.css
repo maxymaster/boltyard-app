@@ -730,3 +730,29 @@ html.shifting, html.shifting body { touch-action: none; overscroll-behavior: non
 .focusbtn.unavail::after { content: ''; position: absolute; left: 20%; right: 20%; top: 50%; border-top: 2px solid currentColor; transform: rotate(-35deg); pointer-events: none; }
 .sysnote { position: absolute; left: 16px; top: max(176px, calc(env(safe-area-inset-top, 0px) + 172px)); z-index: 60; max-width: calc(100% - 96px); width: max-content; padding: 10px 14px; background: rgba(14, 26, 33, .94); border-left: 3px solid var(--hazard); font: 600 14px/1.3 var(--font-ui); color: var(--text); pointer-events: none; text-align: left; }
 .sysnote[hidden] { display: none; }
+
+/* ================= native app shell (html.native: ui.js sets it when the wrapper defined window.BY_NATIVE) =================
+   In a browser / the claude.ai viewer the host pads :root by the safe-area insets and #app sits inside that box (--sat/--sab stay 0).
+   In the app there is no host: #app covers the whole screen and each edge bar pads itself, so the bars' own backgrounds run under
+   the Dynamic Island and the home indicator instead of leaving letterbox bands. Needs viewport-fit=cover in the wrapper's page. */
+:root { --sat: 0px; --sab: 0px; }
+html.native { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); --dock-h: calc(68px + max(8px, var(--sab))); }
+html.native:not(.shifting) { touch-action: pan-x pan-y; }          /* scrolling lists only: no pinch or double-tap zoom anywhere */
+html.native #app { position: fixed; top: 0; bottom: 0; left: 0; right: 0; height: auto; box-shadow: none; }
+html.native .hud { padding-top: calc(4px + var(--sat)); }
+html.native #arena { height: calc(100% - var(--sab)); }             /* the play field stops above the home indicator */
+html.native .title-top { padding-top: calc(12px + var(--sat)); }
+html.native .title-bot { padding-bottom: max(18px, calc(var(--sab) + 4px)); }
+html.native .ws-top { padding-top: calc(2px + var(--sat)); }
+html.native .ws-dock { padding-bottom: max(8px, var(--sab)); }
+html.native .overlay { padding-top: var(--sat); }
+html.native .sheet { padding-bottom: max(16px, var(--sab)); }
+html.native .rep-foot { padding-bottom: max(14px, var(--sab)); }
+
+/* version line at the foot of Settings */
+.about { margin: 2px 0 0; text-align: center; font: 600 12px/1.4 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+html.native .title-bot { background: var(--ink); }                  /* opaque: the attract arena ends above the home indicator */
+
+/* slim workshop header on phones: with the portrait hidden the header row is the only column (it used to land in an implicit
+   second column, which left a dead strip on the left and squeezed the currencies) */
+@media (max-width: 459px) { .ws.slim .ws-head { grid-column: 1; } }

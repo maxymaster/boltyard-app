@@ -7,6 +7,11 @@
   var OTSEC = D.SECTORS.length;   // Overtime is the last sector (16)
   var KEY = 'boltyard.save.v1';
   var doc = root.document;
+  // Release label shown in Settings. The app wrapper may set window.BY_VERSION (e.g. '1.0 (build 7)') to show the bundle's own.
+  var VERSION = '1.0', BUILD = 6;
+  // Inside the native app the wrapper sets window.BY_NATIVE = true before these scripts: the page is already fullscreen, portrait
+  // and kept awake, so Focus mode (fullscreen + wake lock) has nothing to do and its controls are hidden (style.css: html.native).
+  var NATIVE = !!root.BY_NATIVE;
 
   // ------------------------------------------------------------------ helpers
   function $(id) { return doc.getElementById(id); }
@@ -1276,20 +1281,6 @@
     var id = cheapestAffordable();
     if (id) scrollNodeIntoView(id, { smooth: true });
   }
-  // ring focus for the jump bar: where the action is in that act (affordable, else open, else the plate)
-  function ringFocus(k) {
-    var pick = [], any = [], open = [], id;
-    for (id in BP.pos) {
-      if (ringOf(id) !== k || !BP.shown[id]) continue;
-      any.push(id);
-      var s = BP.st[id];
-      if (s && s.aff) pick.push(id); else if (s && !s.maxed && !s.cls) open.push(id);
-    }
-    var set = pick.length ? pick : open.length ? open : any;
-    if (!set.length) return BP.plates[k].pos;
-    var sx = 0, sy = 0; set.forEach(function (q) { sx += BP.pos[q].x; sy += BP.pos[q].y; });
-    return { x: sx / set.length, y: sy / set.length };
-  }
   function jumpTo(k) {
     var id, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
     for (id in BP.pos) {
@@ -1826,6 +1817,7 @@
 
   // ================================================================== FOCUS MODE (SPEC 12.14)
   // Two layers: a fullscreen attempt (the artifact viewer or iPhone Safari may refuse) and touch guards that are always on in a shift.
+  // In the native app (NATIVE) only the touch guards run: no fullscreen request, no wake lock, no Focus controls, no notes.
   var FKEY = 'boltyard.focus.v1';
   var focusState = { want: false, fs: false, entered: false, refused: false, wake: null, wakeRefused: false, noted: false, lastDragEnd: 0, lastEnd: 0 };
   // one quiet note per session about what the browser refused (fullscreen first, else the wake lock); never twice
@@ -1837,7 +1829,7 @@
     root.clearTimeout(sysT); sysT = root.setTimeout(function () { els.sysNote.hidden = true; }, 4200);
   }
   function fsRefused() { focusState.refused = true; syncFocusUi(); sysNote("Fullscreen isn't allowed here \u2014 touch guards are still on"); }
-  function focusRead() { try { focusState.want = root.localStorage.getItem(FKEY) === '1'; } catch (e) { /* ignore */ } }
+  function focusRead() { if (NATIVE) return; try { focusState.want = root.localStorage.getItem(FKEY) === '1'; } catch (e) { /* ignore */ } }
   function focusWrite() { try { root.localStorage.setItem(FKEY, focusState.want ? '1' : '0'); } catch (e) { /* ignore */ } }
   function fsElement() { try { return doc.fullscreenElement || doc.webkitFullscreenElement || null; } catch (e) { return null; } }
   function fsSupported() { var de = doc.documentElement; return !!(de && (de.requestFullscreen || de.webkitRequestFullscreen)); }
@@ -1847,6 +1839,7 @@
   function unlockOrientation() { try { var o = root.screen && root.screen.orientation; if (o && o.unlock) o.unlock(); } catch (e) { /* ignore */ } }
   function enterFs() {
     var de = doc.documentElement, p;
+    if (NATIVE) return;
     if (!fsSupported()) { fsRefused(); return; }
     try {
       if (de.requestFullscreen) p = de.requestFullscreen({ navigationUI: 'hide' }); else p = de.webkitRequestFullscreen();
@@ -1873,6 +1866,7 @@
   }
   // the Focus button: fullscreen on/off, remembered
   function toggleFocus() {
+    if (NATIVE) return;
     A.play('click');
     if (fsElement()) { focusState.want = false; focusWrite(); exitFs(); }
     else { focusState.want = true; focusWrite(); focusState.refused = false; enterFs(); }
@@ -1902,7 +1896,7 @@
   // screen wake lock while a shift is running
   function wakeAcquire() {
     try {
-      if (!root.navigator || !root.navigator.wakeLock || focusState.wake) return;
+      if (NATIVE || !root.navigator || !root.navigator.wakeLock || focusState.wake) return;
       var p = root.navigator.wakeLock.request('screen');
       if (p && p.then) p.then(function (l) {
         focusState.wake = l;
@@ -1939,7 +1933,7 @@
       'secTiles', 'secInfo', 'tabBtnBp', 'tabBtnCodex', 'tabBtnLog', 'bpBadge', 'pane', 'tabBp', 'tabCodex', 'tabLog', 'bp', 'sheet',
       'nsIcon', 'nsName', 'nsBranch', 'nsLevel', 'nsDesc', 'nsNow', 'nsNext', 'nsCost', 'btnBuy', 'nsClose', 'btnClockIn', 'clockLabel',
       'pause', 'btnResume', 'btnClockOut', 'swPauseSound', 'report', 'repNo', 'repSector', 'repStamp', 'repLine', 'repUnlock', 'repRows', 'repNew',
-      'fund', 'fundT', 'fundS', 'fundFill', 'btnRepPrimary', 'btnRepSecond', 'victory', 'vicStamp', 'vicStamp2', 'vicLine', 'vicUnlock', 'vicRows', 'btnKeep', 'btnVic2', 'wsBanner', 'wsBannerT', 'wsBannerS', 'battBud', 'hudBoltsBox', 'settings', 'settingsScrim', 'swSound', 'swShake', 'shakeNote', 'repNext', 'btnReset', 'btnSetClose', 'secActs', 'bpJump', 'btnMax', 'nsTrack', 'nsReq', 'swFocus', 'focusNote', 'btnFocusHud', 'btnFocusTitle', 'btnFocusWs', 'bpZoomIn', 'bpZoomOut', 'bpHome'];
+      'fund', 'fundT', 'fundS', 'fundFill', 'btnRepPrimary', 'btnRepSecond', 'victory', 'vicStamp', 'vicStamp2', 'vicLine', 'vicUnlock', 'vicRows', 'btnKeep', 'btnVic2', 'wsBanner', 'wsBannerT', 'wsBannerS', 'battBud', 'hudBoltsBox', 'settings', 'settingsScrim', 'swSound', 'swShake', 'shakeNote', 'repNext', 'btnReset', 'btnSetClose', 'secActs', 'bpJump', 'btnMax', 'nsTrack', 'nsReq', 'swFocus', 'focusNote', 'btnFocusHud', 'btnFocusTitle', 'btnFocusWs', 'bpZoomIn', 'bpZoomOut', 'bpHome', 'about'];
     ids.forEach(function (id) { els[id] = $(id); });
     els.tabs = doc.querySelector('.ws-tabs');
     els.dock = doc.querySelector('.ws-dock');
@@ -2059,6 +2053,11 @@
       save = E.loadSave(null);
     }
     try { R.init(els.arena, renderOpts()); } catch (e) { /* ignore */ }
+    if (NATIVE) {
+      doc.documentElement.classList.add('native');
+      [els.btnFocusHud, els.btnFocusTitle, els.btnFocusWs, els.swFocus].forEach(function (b) { b.hidden = true; });
+    }
+    if (els.about) els.about.textContent = 'Boltyard v' + (typeof root.BY_VERSION === 'string' && root.BY_VERSION ? root.BY_VERSION : VERSION + ' (build ' + BUILD + ')');
     focusRead();
     bindEvents();
     syncFocusUi();
@@ -2075,6 +2074,7 @@
   // ================================================================== debug / test hook
   BY.UI = {
     fmt: fmt,
+    version: VERSION, build: BUILD, native: NATIVE,
     debug: {
       run: function () { return run; },
       save: function () { return save; },
@@ -2086,7 +2086,7 @@
       get timeScale() { return dbg.timeScale; },
       set timeScale(v) { dbg.timeScale = +v > 0 ? +v : 1; },
       screen: function () { return mode; },
-      focus: function () { return { want: focusState.want, fs: !!fsElement(), refused: focusState.refused, wake: !!focusState.wake }; },
+      focus: function () { return { want: focusState.want, fs: !!fsElement(), refused: focusState.refused, wake: !!focusState.wake, native: NATIVE }; },
       view: function (tx, ty, z) { if (z !== undefined) { stopAnim(); setView(tx === null ? MAP.tx : tx, ty === null ? MAP.ty : ty, z); } return { tx: MAP.tx, ty: MAP.ty, z: MAP.z }; },
       panTo: function (id) { var q = BP.pos[id]; if (!q) return false; stopAnim(); setView(MAP.tx, MAP.ty, Math.max(MAP.z, 0.9)); panToPoint(q.x, q.y, false); return !!BP.shown[id]; },
       map: function () { return { tx: MAP.tx, ty: MAP.ty, z: MAP.z, vw: MAP.vw, vh: MAP.vh, shown: Object.keys(BP.shown).filter(function (k) { return BP.shown[k]; }), ghost: Object.keys(BP.ghost).filter(function (k) { return BP.ghost[k]; }) }; },
