@@ -5,3 +5,4 @@ game/shots/
 build/
 out/
 .DS_Store
+game/dist-web/

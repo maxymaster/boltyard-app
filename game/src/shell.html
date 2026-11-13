@@ -197,6 +197,11 @@
         <li>Scrap bots and grab bolts before the battery runs flat.</li>
         <li>Spend bolts in the Workshop. Scrap enough bots and a Warden turns up.</li>
       </ol>
+      <div class="bk">
+        <div class="bk-row"><button id="btnBackup" class="btn-ghost" type="button">Copy save code</button><button id="btnRestore" class="btn-ghost" type="button">Restore from code</button></div>
+        <textarea id="bkCode" class="bk-code" hidden rows="3" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Save code" placeholder="Paste your save code here"></textarea>
+        <p id="bkMsg" class="bk-msg" role="status" aria-live="polite" hidden></p>
+      </div>
       <button id="btnReset" class="btn-ghost danger" type="button">Reset progress</button>
       <p id="about" class="about">Boltyard</p>
     </div>

@@ -11,6 +11,14 @@ Boltyard wrapped as a native iPhone app with [Capacitor](https://capacitorjs.com
 | `ios/` | The Xcode project. `GameViewController` (in `AppDelegate.swift`) hides the status bar, defers edge swipes and stops the web view from scrolling. `SceneDelegate.swift` keeps the screen awake. |
 | `.github/workflows/ios.yml` | Builds an **unsigned** `Boltyard.ipa` on a GitHub cloud Mac. |
 
+## Home Screen web app (no install tool needed)
+
+**https://maxymaster.github.io/boltyard-app/** is the same game as an offline web app. On iPhone, open it in Safari, tap **Share → Add to Home Screen**, then open the icon once while online. After that it works offline and never expires. Every push that touches `game/` republishes it (`.github/workflows/pages.yml`), and the icon picks up the new version the next time it's opened online.
+
+Its save lives only inside the Home Screen app. **Settings → Copy save code / Restore from code** moves progress between the web app, the iPhone app and claude.ai, or backs it up.
+
+Build it locally with `node game/tools/build.js --pwa`, which writes `game/dist-web/`.
+
 ## Getting a new build onto your iPhone
 
 1. Push to `main`, or run it by hand: **Actions → Build iPhone app → Run workflow**. A build takes about 10 minutes.

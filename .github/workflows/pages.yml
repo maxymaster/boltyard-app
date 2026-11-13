@@ -1,0 +1,46 @@
+# Publishes the Home Screen web app to GitHub Pages: https://maxymaster.github.io/boltyard-app/
+# Runs on every push to main that touches the game, or by hand (Actions tab -> "Publish web app" -> Run workflow).
+# Needs Settings -> Pages -> Source: GitHub Actions.
+name: Publish web app
+
+on:
+  push:
+    branches: [main]
+    paths: ['game/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Free GitHub accounts can only use Pages on public repos; skip quietly while the repo is private.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the web app
+        run: node game/tools/build.js --pwa
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: game/dist-web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

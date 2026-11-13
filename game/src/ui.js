@@ -12,6 +12,8 @@
   // Inside the native app the wrapper sets window.BY_NATIVE = true before these scripts: the page is already fullscreen, portrait
   // and kept awake, so Focus mode (fullscreen + wake lock) has nothing to do and its controls are hidden (style.css: html.native).
   var NATIVE = !!root.BY_NATIVE;
+  // The Home Screen web app (build.js --pwa) sets BY_NATIVE for the app layout and BY_WEBAPP so the screen wake lock is still requested.
+  var WEBAPP = !!root.BY_WEBAPP;
 
   // ------------------------------------------------------------------ helpers
   function $(id) { return doc.getElementById(id); }
@@ -1787,7 +1789,7 @@
     if (on) { A.unlock(); A.play('click'); }
   }
   function openSettings() {
-    els.settings.hidden = false; disarmReset(); syncSwitches();
+    els.settings.hidden = false; disarmReset(); resetBackupUi(); syncSwitches();
     try { els.swSound.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
   }
   function closeSettings() { els.settings.hidden = true; disarmReset(); A.play('click'); }
@@ -1813,6 +1815,56 @@
     els.wsCoreWrap.hidden = true;
     applySettings();
     toTitle();
+  }
+
+  // ------------------------------------------------------------------ save backup code (Settings)
+  // 'BY1:' + base64 of the save JSON. Restoring validates through E.loadSave, writes the save and reloads the page.
+  var bkStage = 0;
+  function b64enc(str) { return root.btoa(unescape(encodeURIComponent(str))); }
+  function b64dec(str) { return decodeURIComponent(escape(root.atob(str))); }
+  function bkMsg(text, bad) { els.bkMsg.textContent = text; els.bkMsg.hidden = !text; els.bkMsg.classList.toggle('bad', !!bad); }
+  function resetBackupUi() {
+    bkStage = 0; els.bkCode.hidden = true; els.bkCode.value = ''; els.bkCode.readOnly = false;
+    els.btnRestore.textContent = 'Restore from code'; bkMsg('');
+  }
+  function onBackup() {
+    A.play('click');
+    var code = 'BY1:' + b64enc(JSON.stringify(save));
+    bkStage = 0; els.btnRestore.textContent = 'Restore from code';
+    els.bkCode.hidden = false; els.bkCode.readOnly = true; els.bkCode.value = code;
+    try { els.bkCode.focus({ preventScroll: true }); els.bkCode.select(); } catch (e) { /* ignore */ }
+    var done = function () { bkMsg('Save code copied. Paste it somewhere safe, like Notes.'); };
+    var manual = function () { bkMsg('Copy the code above and keep it somewhere safe, like Notes.'); };
+    try {
+      if (root.navigator && root.navigator.clipboard && root.navigator.clipboard.writeText) root.navigator.clipboard.writeText(code).then(done, manual);
+      else manual();
+    } catch (e) { manual(); }
+  }
+  function parseCode(text) {
+    text = String(text || '').replace(/\s+/g, '');
+    if (text.indexOf('BY1:') !== 0) throw new Error('prefix');
+    var raw = JSON.parse(b64dec(text.slice(4)));
+    if (!raw || typeof raw !== 'object' || typeof raw.v !== 'number') throw new Error('shape');
+    if (raw.v > E.newSave().v) throw new Error('newer');
+    E.loadSave(JSON.parse(JSON.stringify(raw)));
+    return raw;
+  }
+  function onRestore() {
+    if (bkStage === 0) {
+      A.play('click');
+      bkStage = 1; els.bkCode.hidden = false; els.bkCode.readOnly = false; els.bkCode.value = '';
+      els.btnRestore.textContent = 'Restore now';
+      bkMsg('Paste your save code above. This replaces your current progress.');
+      try { els.bkCode.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+      return;
+    }
+    var raw;
+    try { raw = parseCode(els.bkCode.value); }
+    catch (e) { A.play('deny'); bkMsg(e && e.message === 'newer' ? 'That code is from a newer version of Boltyard.' : "That doesn't look like a Boltyard save code.", true); return; }
+    try { root.localStorage.setItem(KEY, JSON.stringify(raw)); } catch (e) { A.play('deny'); bkMsg('Could not save here: storage is unavailable.', true); return; }
+    A.play('buy'); bkMsg('Save restored. Reloading\u2026');
+    newerSave = true;           // stop this page from writing its old save over the restored one
+    root.setTimeout(function () { try { root.location.reload(); } catch (e) { /* ignore */ } }, 400);
   }
 
   // ================================================================== FOCUS MODE (SPEC 12.14)
@@ -1896,7 +1948,7 @@
   // screen wake lock while a shift is running
   function wakeAcquire() {
     try {
-      if (NATIVE || !root.navigator || !root.navigator.wakeLock || focusState.wake) return;
+      if ((NATIVE && !WEBAPP) || !root.navigator || !root.navigator.wakeLock || focusState.wake) return;
       var p = root.navigator.wakeLock.request('screen');
       if (p && p.then) p.then(function (l) {
         focusState.wake = l;
@@ -1933,7 +1985,7 @@
       'secTiles', 'secInfo', 'tabBtnBp', 'tabBtnCodex', 'tabBtnLog', 'bpBadge', 'pane', 'tabBp', 'tabCodex', 'tabLog', 'bp', 'sheet',
       'nsIcon', 'nsName', 'nsBranch', 'nsLevel', 'nsDesc', 'nsNow', 'nsNext', 'nsCost', 'btnBuy', 'nsClose', 'btnClockIn', 'clockLabel',
       'pause', 'btnResume', 'btnClockOut', 'swPauseSound', 'report', 'repNo', 'repSector', 'repStamp', 'repLine', 'repUnlock', 'repRows', 'repNew',
-      'fund', 'fundT', 'fundS', 'fundFill', 'btnRepPrimary', 'btnRepSecond', 'victory', 'vicStamp', 'vicStamp2', 'vicLine', 'vicUnlock', 'vicRows', 'btnKeep', 'btnVic2', 'wsBanner', 'wsBannerT', 'wsBannerS', 'battBud', 'hudBoltsBox', 'settings', 'settingsScrim', 'swSound', 'swShake', 'shakeNote', 'repNext', 'btnReset', 'btnSetClose', 'secActs', 'bpJump', 'btnMax', 'nsTrack', 'nsReq', 'swFocus', 'focusNote', 'btnFocusHud', 'btnFocusTitle', 'btnFocusWs', 'bpZoomIn', 'bpZoomOut', 'bpHome', 'about'];
+      'fund', 'fundT', 'fundS', 'fundFill', 'btnRepPrimary', 'btnRepSecond', 'victory', 'vicStamp', 'vicStamp2', 'vicLine', 'vicUnlock', 'vicRows', 'btnKeep', 'btnVic2', 'wsBanner', 'wsBannerT', 'wsBannerS', 'battBud', 'hudBoltsBox', 'settings', 'settingsScrim', 'swSound', 'swShake', 'shakeNote', 'repNext', 'btnReset', 'btnSetClose', 'secActs', 'bpJump', 'btnMax', 'nsTrack', 'nsReq', 'swFocus', 'focusNote', 'btnFocusHud', 'btnFocusTitle', 'btnFocusWs', 'bpZoomIn', 'bpZoomOut', 'bpHome', 'about', 'btnBackup', 'btnRestore', 'bkCode', 'bkMsg'];
     ids.forEach(function (id) { els[id] = $(id); });
     els.tabs = doc.querySelector('.ws-tabs');
     els.dock = doc.querySelector('.ws-dock');
@@ -2001,6 +2053,8 @@
     els.swSound.addEventListener('click', function () { setSound(!save.settings.sound); });
     els.swShake.addEventListener('click', function () { save.settings.shake = !save.settings.shake; applySettings(); writeStore(); A.play('click'); });
     els.btnReset.addEventListener('click', onReset);
+    els.btnBackup.addEventListener('click', onBackup);
+    els.btnRestore.addEventListener('click', onRestore);
     doc.addEventListener('pointerdown', function (e) { if (resetArmed && e.target !== els.btnReset) disarmReset(); }, true);
     els.secTiles.addEventListener('click', function (e) { var b = e.target.closest('.stile'); if (b) pickSector(+b.getAttribute('data-n')); });
     [els.tabBtnBp, els.tabBtnCodex, els.tabBtnLog].forEach(function (b) { b.addEventListener('click', function () { if (tab !== b.getAttribute('data-tab')) showTab(b.getAttribute('data-tab')); }); });
@@ -2074,7 +2128,7 @@
   // ================================================================== debug / test hook
   BY.UI = {
     fmt: fmt,
-    version: VERSION, build: BUILD, native: NATIVE,
+    version: VERSION, build: BUILD, native: NATIVE, webapp: WEBAPP,
     debug: {
       run: function () { return run; },
       save: function () { return save; },

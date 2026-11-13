@@ -3,6 +3,7 @@
 // Assembles dist/index.html (page contract, SPEC 8) and dist/test.html (same, wrapped in the host skeleton).
 // --app also writes dist-app/index.html: the offline iPhone-app page (fonts inlined, src/native.js first,
 // full document with viewport-fit=cover). Fonts come from ../ios-app/node_modules/@fontsource or tools/fonts/.
+// --pwa writes dist-web/: the Home Screen web app (same offline page + manifest, icons, service worker from tools/webapp/).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -11,6 +12,7 @@ const rd = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const useStub = process.argv.includes('--stub-render') || !fs.existsSync(path.join(root, 'src/render.js'));
 const appBuild = process.argv.includes('--app');
+const pwaBuild = process.argv.includes('--pwa');
 const scripts = [
   ['src/data.js'], ['src/engine.js'], ['src/sprites.js'], ['src/audio.js'],
   [useStub ? 'tools/stub-render.js' : 'src/render.js'], ['src/ui.js']
@@ -45,7 +47,7 @@ const wrapped = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">\n
 fs.writeFileSync(path.join(root, 'dist/test.html'), wrapped);
 console.log('build ok: dist/index.html ' + (out.length / 1024).toFixed(0) + ' KB, render = ' + (useStub ? 'stub' : 'src/render.js'));
 
-if (appBuild) {
+if (appBuild || pwaBuild) {
   const dirs = [path.join(root, 'tools/fonts'), path.join(root, '../../ios-app/node_modules/@fontsource'), path.join(root, '../ios-app/node_modules/@fontsource')];
   const find = (pkg, file) => {
     for (const d of dirs) for (const p of [path.join(d, file), path.join(d, pkg, 'files', file)]) if (fs.existsSync(p)) return p;
@@ -64,7 +66,27 @@ if (appBuild) {
     '<style>\n' + fontCss + ':root{color-scheme:dark}html,body{margin:0;height:100%;background:#0e1a21}[hidden]{display:none!important}\n</style>\n' +
     scriptTags(['src/native.js']) + css + '</head><body>\n' + body + scriptTags(scripts.map(x => x[0])) + '</body></html>\n';
   if (/https?:\/\/(?!www\.w3\.org)/.test(app)) { console.error('build --app: page still references the network'); process.exit(1); }
-  fs.mkdirSync(path.join(root, 'dist-app'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'dist-app/index.html'), app);
-  console.log('build ok: dist-app/index.html ' + (app.length / 1024).toFixed(0) + ' KB (offline app page)');
+  if (appBuild) {
+    fs.mkdirSync(path.join(root, 'dist-app'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'dist-app/index.html'), app);
+    console.log('build ok: dist-app/index.html ' + (app.length / 1024).toFixed(0) + ' KB (offline app page)');
+  }
+  if (pwaBuild) {
+    const W = path.join(root, 'tools/webapp'), D = path.join(root, 'dist-web');
+    const head = '<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n' +
+      '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n<meta name="apple-mobile-web-app-title" content="Boltyard">\n' +
+      '<meta name="theme-color" content="#0e1a21">\n<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-180.png">\n' +
+      '<script>window.BY_WEBAPP = true;</script>\n';
+    const reg = '<script>\nif (\'serviceWorker\' in navigator && (location.protocol === \'https:\' || location.hostname === \'localhost\')) {\n' +
+      '  window.addEventListener(\'load\', function () { navigator.serviceWorker.register(\'sw.js\').catch(function () {}); });\n}\n</script>\n';
+    let web = app.replace('<title>Boltyard</title>\n', '<title>Boltyard</title>\n' + head).replace('</body></html>', reg + '</body></html>');
+    if (web === app) { console.error('build --pwa: could not inject head'); process.exit(1); }
+    const ver = require('crypto').createHash('sha256').update(web).digest('hex').slice(0, 12);
+    fs.mkdirSync(D, { recursive: true });
+    fs.writeFileSync(path.join(D, 'index.html'), web);
+    fs.writeFileSync(path.join(D, 'sw.js'), fs.readFileSync(path.join(W, 'sw.js'), 'utf8').replace('__VERSION__', ver));
+    for (const f of ['manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(W, f), path.join(D, f));
+    fs.writeFileSync(path.join(D, '.nojekyll'), '');
+    console.log('build ok: dist-web/ (Home Screen web app, cache ' + ver + ') ' + (web.length / 1024).toFixed(0) + ' KB');
+  }
 }
